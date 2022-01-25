@@ -2,7 +2,7 @@ import os,sys,numpy as np
 from turtle import shape
 import matplotlib.pyplot as plt
 import torch
-
+from tqdm import tqdm
 import time
 
 def forloopdists(feats, protos):
@@ -29,12 +29,12 @@ def numpydists(feats, protos):
 def pytorchdists(feats0, protos0, device):
   #YOUR implementation here
 
-  X = torch.from_numpy(feats0)
-  T = torch.from_numpy(protos0)
-  diff = torch.sub(X.unsqueeze(1), T.unsqueeze(0))
+  #X = torch.from_numpy(feats0)
+  #T = torch.from_numpy(protos0)
+  diff = torch.sub(feats0.unsqueeze(1), protos0.unsqueeze(0))
   #norm_sq = torch.sum(diff * diff, -1)
   norm_sq = torch.norm(diff, p = 2, dim = 2) ** 2
-  return norm_sq.numpy()
+  return norm_sq
 
 def run():
 
@@ -86,34 +86,103 @@ def run():
   print(np.allclose(dists0, dists1))
   print(np.allclose(dists0, dists2))
 
+def get_mean_and_std(P, D, seed = 4877):
+  np.random.seed(seed)
+  means = np.random.uniform(0, 10, size = (P, D))
+  stds  = np.random.uniform(0, 1, size = P)
+  return means, stds
 
-def kmeans():
-  M = 100
-  N = 50
+def get_data(N = 50, P = 5, seed = 4877):
+  """Generate Gaussian clusters
+
+  Parameters
+  ----------
+  N : int, optional
+      Number of samples, by default 50
+  P : int, optional
+      Number of clusters, by default 2
+  Returns
+  -------
+  numpy.ndarray
+      Data matrix of shape (N, 2), i.e. N samples of (x, y)-coordinates.
+  """
   D = 2
-  P = 5
-
-  np.random.seed(4877)
-  means = np.random.uniform(0, 10, size = (5, D))
-  stds  = np.random.uniform(0, 0.5, size = 5)
-
-  print(means)
-  print(stds)
+  means, stds = get_mean_and_std(P, D, seed)
 
   X = np.zeros((N, D))
 
   for i in range(N):
-    idx = np.random.randint(0, 5)
+    idx = np.random.randint(0, P)
     X[i, :] = np.random.normal(means[idx, :], stds[idx], D)
 
-  fig, ax = plt.subplots()
-  ax.scatter(X[:, 0], X[:, 1], s = 5, label = "Data")
-  ax.scatter(means[:, 0], means[:, 1], label = "True means")
+  return X
   
-  plt.show()
+def kmeans(X, P = 5, M = 10, eps = 0.1, seed = 12345):
+  X = torch.from_numpy(X)
+  N, D = X.shape
+  torch.manual_seed(seed)
   
+  #T    = torch.empty((P, D)).uniform_(-12, 12)
+  T    = torch.empty((P, D))
+  T = X[torch.randint(0, N, (P,)), :]
+  Ts = []
+  T_init = T.clone()
+  device = torch.device('cpu')
+  #device = torch.device('cuda:0')
+  
+  for i in tqdm(range(M)):
+    T_old = T.clone()
+    dist = pytorchdists(X, T, device)
+    idx_j = torch.argmin(dist, dim = 1)
 
+    for j in range(P):
+      idx_i = idx_j == j
+
+      if torch.any(idx_i):
+        T[j, :] = torch.mean(X[idx_i, :], 0)
+      else:
+        print("No update!")
+      
+        
+      #print(T[j, :])
+    #print(torch.abs(T - T_old))
+    Ts.append(T.numpy())
+    if torch.all(torch.abs(T - T_old) <= eps):
+      print(torch.abs(T - T_old))
+      break
+
+  return T, T_init, np.array(Ts)
+
+  
 
 if __name__=='__main__':
   #run()
-  kmeans()
+  N = 1000
+  P1 = 5
+  D = 2
+  seed = 4877
+  X = get_data(N, P1, seed)
+
+  means, stds = get_mean_and_std(P1, D, seed)
+
+  P2 = 5
+  T, T_init, Ts = kmeans(X, P2, M = 50, eps = 0.001, seed = 662552)
+
+  T = T.numpy()
+  T_init = T_init.numpy()
+
+
+  fig, ax = plt.subplots()
+  ax.scatter(X[:, 0], X[:, 1], label = "Data", s = 1, alpha = 0.8)
+  ax.scatter(means[:, 0], means[:, 1], label = "True means", s = 10, alpha = 0.8)
+  ax.scatter(T_init[:, 0], T_init[:, 1], label = "k-means init", s = 5, alpha = 0.8)
+  ax.scatter(T[:, 0], T[:, 1], label = "k-means final", s = 5, alpha = 0.8)
+
+  ax.legend(loc = 2)
+
+  #for i in range(Ts.shape[0]):
+  #  ax.scatter(Ts[i,:, 0], Ts[i, :, 1], label = "step", s = 5, alpha = 0.8, c = "m")
+
+
+
+  plt.show()
