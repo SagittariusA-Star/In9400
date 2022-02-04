@@ -89,7 +89,7 @@ def run():
 def get_mean_and_std(P, D, seed = 4877):
   np.random.seed(seed)
   means = np.random.uniform(0, 10, size = (P, D))
-  stds  = np.random.uniform(0, 1, size = P)
+  stds  = np.random.uniform(0, 0.5, size = P)
   return means, stds
 
 def get_data(N = 50, P = 5, seed = 4877):
@@ -130,59 +130,85 @@ def kmeans(X, P = 5, M = 10, eps = 0.1, seed = 12345):
   device = torch.device('cpu')
   #device = torch.device('cuda:0')
   
+  js = torch.arange(0, P, 1)
+
   for i in tqdm(range(M)):
     T_old = T.clone()
     dist = pytorchdists(X, T, device)
     idx_j = torch.argmin(dist, dim = 1)
 
-    for j in range(P):
-      idx_i = idx_j == j
+    idx_i = torch.unsqueeze(idx_j, 1) == torch.unsqueeze(js, 0)
+    T = torch.sum(torch.unsqueeze(X, 1) * torch.unsqueeze(idx_i, 2), 0)
+    T = (T.t() / torch.sum(idx_i, 0)).t()
 
-      if torch.any(idx_i):
-        T[j, :] = torch.mean(X[idx_i, :], 0)
-      else:
-        print("No update!")
-      
-        
-      #print(T[j, :])
-    #print(torch.abs(T - T_old))
     Ts.append(T.numpy())
     if torch.all(torch.abs(T - T_old) <= eps):
-      print(torch.abs(T - T_old))
+      #inertia = torch.mean(dist[idx_j])
+      inertia = torch.sum(dist[idx_i])
       break
 
-  return T, T_init, np.array(Ts)
+  return T, T_init, np.array(Ts), inertia
 
   
 
 if __name__=='__main__':
+
+  fontsize = 14
+  fonts = {
+  "font.family": "sans-serif",
+  "axes.labelsize": fontsize,
+  "font.size": fontsize,
+  "legend.fontsize": fontsize,
+  "xtick.labelsize": fontsize,
+  "ytick.labelsize": fontsize
+  }
+  plt.rcParams.update(fonts)
+
   #run()
   N = 1000
   P1 = 5
   D = 2
-  seed = 4877
+  #seed = 4877
+  seed = 48776
   X = get_data(N, P1, seed)
 
   means, stds = get_mean_and_std(P1, D, seed)
 
   P2 = 5
-  T, T_init, Ts = kmeans(X, P2, M = 50, eps = 0.001, seed = 662552)
+  T, T_init, Ts, inertia = kmeans(X, P2, M = 1000, eps = 1e-4, seed = 7763)
 
   T = T.numpy()
   T_init = T_init.numpy()
-
+  inertia = inertia.numpy()
 
   fig, ax = plt.subplots()
   ax.scatter(X[:, 0], X[:, 1], label = "Data", s = 1, alpha = 0.8)
   ax.scatter(means[:, 0], means[:, 1], label = "True means", s = 10, alpha = 0.8)
   ax.scatter(T_init[:, 0], T_init[:, 1], label = "k-means init", s = 5, alpha = 0.8)
   ax.scatter(T[:, 0], T[:, 1], label = "k-means final", s = 5, alpha = 0.8)
+  ax.set_xlabel(r"$x_1$")
+  ax.set_ylabel(r"$x_2$")
+  ax.axis("equal")
 
-  ax.legend(loc = 2)
+  ax.legend(loc = 1)
 
   #for i in range(Ts.shape[0]):
   #  ax.scatter(Ts[i,:, 0], Ts[i, :, 1], label = "step", s = 5, alpha = 0.8, c = "m")
 
 
+  P3 = np.arange(1, 11)
+  inertias = np.zeros_like(P3)
+
+  for i in range(10):
+    T, T_init, Ts, inertia = kmeans(X, P3[i], M = 1000, eps = 1e-4, seed = 7763)
+    inertia = inertia.numpy()
+    inertias[i] = inertia
+  
+
+  fig1, ax1 = plt.subplots()
+  ax1.plot(P3, inertias)
+  ax1.set_xlabel(r"# clusters")
+  ax1.set_ylabel(r"Inertia [Arbitrary Units]")
+  
 
   plt.show()
