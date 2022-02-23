@@ -18,8 +18,8 @@ class TwoNetworks(nn.Module):
 
         # TODO select all parts of the two pretrained networks, except for
         # the last linear layer.
-        self.fully_conv1 =
-        self.fully_conv2 =
+        self.fully_conv1 = 
+        self.fully_conv2 = 
 
         # TODO create a linear layer that has in_channels equal to
         # the number of in_features from both networks summed together.
@@ -43,7 +43,7 @@ class SingleNetwork(nn.Module):
     functions: forward
     '''
 
-    def __init__(self, pretrained_net, weight_init=None):
+    def __init__(self, pretrained_net, weight_init = None):
         super(SingleNetwork, self).__init__()
 
         _, num_classes = get_classes_list()
@@ -52,10 +52,27 @@ class SingleNetwork(nn.Module):
         if weight_init is not None:
             # TODO Here we want an additional channel in the weights tensor, specifically in the first
             # conv2d layer so that there are weights for the infrared channel in the input aswell.
-            current_weights =
+            
+            ############################
+
+            current_weights = pretrained_net.conv1.weight
+            out_channels    = pretrained_net.out_channels
+
+            nx, ny = current_weights.shape[1:]
+            new_weights = torch.zeros((4, nx, ny))
+
+            new_weights[:-1, :, :] = current_weights
+
+            ############################
+
 
             if weight_init == "kaiminghe":
-              pass
+                
+                ###########################
+
+                nn.init.kaiming_uniform_(new_weights[-1, ...])
+
+                ###########################
 
 
             # TODO Create a new conv2d layer, and set the weights to be
@@ -64,8 +81,20 @@ class SingleNetwork(nn.Module):
             # a model parameter.
             # eg. first_conv_layer.weight = torch.nn.Parameter(your_new_weights)
 
+            ###########################
+
+            pretrained_net.conv1 = nn.Conv2d(4, out_channels)
+
+            ###########################
+
+
         # TODO Overwrite the last linear layer.
-        pretrained_net.fc =
+        
+        #############################
+
+        pretrained_net.fc = nn.Linear(512, 17, bias = True)
+
+        #############################
 
         self.net = pretrained_net
 
