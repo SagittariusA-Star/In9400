@@ -22,6 +22,8 @@ import sklearn.metrics
 from typing import Callable, Optional
 
 from RainforestDataset import RainforestDataset
+from YourNetwork import SingleNetwork#, TwoNetworks
+import sys 
 
 def train_epoch(model, trainloader, criterion, device, optimizer):
 
@@ -126,11 +128,30 @@ class yourloss(nn.modules.loss._Loss):
 
     def __init__(self, reduction: str = 'mean') -> None:
         #TODO
+        self.reduction = reduction
         
     def forward(self, input_: Tensor, target: Tensor) -> Tensor:
-        #TODO
-        return loss
+      """Evaluation of binary cross-entropy loss with sigmoid logits, 
+         to accomodate multi-class and multi-label outputs.
 
+      Parameters
+      ----------
+      input_ : Tensor
+          Output from last linear layer of network
+      target : Tensor
+          Tensor of labels to compare output of last linear layer to
+
+      Returns
+      -------
+      Tensor
+          Binary cross-entropy loss with sigmoid logits of the multi-class, multi-label, dataset.
+      """
+        #TODO
+        ################################################################
+        loss_criterion = nn.BCEwithLogitsLoss(reduction = "mean")
+        loss = loss_criterion(input_, target)
+        ################################################################
+        return loss
 
 def runstuff():
   config = dict()
@@ -167,18 +188,22 @@ def runstuff():
   # Datasets
   
   ##########################
-  data_root_dir = "../data/" 
+  data_root_dir = "../../data/" 
   ##########################
   
   image_datasets={}
-  image_datasets['train']=RainforestDataset(root_dir = data_root_dir, trvaltest=0, transform = data_transforms['train'])
-  image_datasets['val']=RainforestDataset(root_dir = data_root_dir, trvaltest=1, transform = data_transforms['val'])
+  image_datasets['train'] = RainforestDataset(root_dir = data_root_dir, trvaltest=0, transform = data_transforms['train'])
+  image_datasets['val']   = RainforestDataset(root_dir = data_root_dir, trvaltest=1, transform = data_transforms['val'])
 
   # Dataloaders
   #TODO use num_workers=1
+
+  ###################################
   dataloaders = {}
-  dataloaders['train'] = #
-  dataloaders['val'] = #
+  dataloaders['train'] = DataLoader(image_datasets['train'], batch_size = config["batchsize_train"],   shuffle = True, num_workers = 1) #
+  dataloaders['val']   = DataLoader(image_datasets['val'],   batch_size = config["batchsize_val"],     shuffle = True, num_workers = 1) #
+
+  ###################################
 
   # Device
   if True == config['use_gpu']:
@@ -188,22 +213,34 @@ def runstuff():
 
   # Model
   # TODO create an instance of the network that you want to use.
-  model = # TwoNetworks()
+  
+  ####################################
+  pretrained_resnet18 = models.resnet18(pretrained = True)
+
+  #model = # TwoNetworks()
+  model = SingleNetwork(pretrained_resnet18, weight_init = "kaiminghe")
+  ####################################
 
   model = model.to(device)
 
   lossfct = yourloss()
   
+  #######################################################################
   #TODO
   # Observe that all parameters are being optimized
-  someoptimizer = #
+
+  someoptimizer = optim.SGD(model.parameters(), lr = config['lr'])
 
   # Decay LR by a factor of 0.3 every X epochs
   #TODO
-  somelr_scheduler = #
+
+  every_x_epochs = 5 # Hyperparameter
+
+  somelr_scheduler = lr_scheduler.StepLR(someoptimizer, factor = config['scheduler_factor'], step_size = config['scheduler_stepsize'])
+
+  #######################################################################
 
   best_epoch, best_measure, bestweights, trainlosses, testlosses, testperfs = traineval2_model_nocv(dataloaders['train'], dataloaders['val'] ,  model ,  lossfct, someoptimizer, somelr_scheduler, num_epochs= config['maxnumepochs'], device = device , numcl = config['numcl'] )
-
 
 if __name__=='__main__':
 

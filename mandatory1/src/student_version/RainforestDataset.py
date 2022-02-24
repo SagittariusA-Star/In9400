@@ -53,12 +53,12 @@ class RainforestDataset(Dataset):
         self.root_dir  = root_dir
         self.transform = transform
         
-        dataframe = pd.read_csv(root_dir)
+        dataframe = pd.read_csv(root_dir + "train_v2.csv")
         img_name  = dataframe.iloc[:, 0]
         labels         = dataframe.iloc[:, 1]
         labels         = [string.split() for string in labels]
 
-        binerizer      = preprocessing.MultiLabelBinarizer()
+        binarizer      = preprocessing.MultiLabelBinarizer()
 
         self.labels    = binarizer.fit_transform(labels) 
         #########################
@@ -96,7 +96,7 @@ class RainforestDataset(Dataset):
 
         #########################
 
-        with PIL.Image.open(self.img_filenames[idx]) as img:
+        with PIL.Image.open(self.root_dir + "train-tif-v2/" + self.img_filenames[idx]) as img:
             img = np.asarray(img)
         
 

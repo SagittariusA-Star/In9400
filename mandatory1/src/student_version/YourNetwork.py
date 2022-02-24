@@ -1,8 +1,7 @@
 import torch
 import torch.nn as nn
 from RainforestDataset import get_classes_list
-
-
+"""
 class TwoNetworks(nn.Module):
     '''
     This class takes two pretrained networks,
@@ -34,7 +33,7 @@ class TwoNetworks(nn.Module):
 
         return
 
-
+"""
 class SingleNetwork(nn.Module):
     '''
     This class takes one pretrained network,
@@ -54,14 +53,13 @@ class SingleNetwork(nn.Module):
             # conv2d layer so that there are weights for the infrared channel in the input aswell.
             
             ############################
+            current_weights = pretrained_net.conv1.weight           # Extracting weights of first convolutional layer in default pretrained network (ResNet 18)
 
-            current_weights = pretrained_net.conv1.weight
-            out_channels    = pretrained_net.out_channels
+            out_channels    = pretrained_net.conv1.out_channels     # Extracting number of output channels of first convolutional layer in default pretrained network (ResNet 18)
 
-            nx, ny = current_weights.shape[1:]
-            new_weights = torch.zeros((4, nx, ny))
+            nout, nin, nx, ny = current_weights.shape               
+            new_weights = torch.zeros((nout, 4, nx, ny))            # Setting up zeros tensor for new weights to accomodate for the IR channel in the input images            
 
-            new_weights[:-1, :, :] = current_weights
 
             ############################
 
@@ -70,10 +68,9 @@ class SingleNetwork(nn.Module):
                 
                 ###########################
 
-                nn.init.kaiming_uniform_(new_weights[-1, ...])
+                nn.init.kaiming_uniform_(new_weights[-1, ...])  # Kaiming He initialization of zeros weights tensor
 
                 ###########################
-
 
             # TODO Create a new conv2d layer, and set the weights to be
             # what you created above. You will need to pass the weights to
@@ -83,7 +80,15 @@ class SingleNetwork(nn.Module):
 
             ###########################
 
-            pretrained_net.conv1 = nn.Conv2d(4, out_channels)
+            new_weights[:, :-1, :, :] = current_weights     # Copying RBG channel weights to new weights tensor
+
+            pretrained_net.conv1 = nn.Conv2d(4, out_channels, 
+                                            kernel_size = pretrained_net.conv1.kernel_size,
+                                            stride = pretrained_net.conv1.stride,
+                                            padding = pretrained_net.conv1.padding,
+                                            bias = pretrained_net.conv1.bias)                       # Overwriting current first convolutional layer
+
+            pretrained_net.conv1.weight = torch.nn.Parameter(new_weights)                           # Setting new weight parameters
 
             ###########################
 
@@ -91,8 +96,7 @@ class SingleNetwork(nn.Module):
         # TODO Overwrite the last linear layer.
         
         #############################
-
-        pretrained_net.fc = nn.Linear(512, 17, bias = True)
+        pretrained_net.fc = nn.Linear(512, 17, bias = True)      # Overwriting last fully connected layer to accomodate for 17 output classes 
 
         #############################
 
