@@ -1,5 +1,6 @@
 
 
+from __future__ import division
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -21,23 +22,48 @@ import sklearn.metrics
 
 from typing import Callable, Optional
 
-from RainforestDataset import RainforestDataset
+from RainforestDataset import RainforestDataset, ChannelSelect
 from YourNetwork import SingleNetwork#, TwoNetworks
 import sys 
 
 def train_epoch(model, trainloader, criterion, device, optimizer):
 
-    #TODO model.train() or model.eval()?
+    #TODO model.train() or model.eval()? 
+    ###############
+    model.train()
+    ###############
  
     losses = []
     for batch_idx, data in enumerate(trainloader):
-        if (batch_idx %100==0) and (batch_idx>=100):
+        if (batch_idx % 100 == 0) and (batch_idx >= 100):
           print('at batchidx',batch_idx)
-    
+
         # TODO calculate the loss from your minibatch.
         # If you are using the TwoNetworks class you will need to copy the infrared
         # channel before feeding it into your model. 
-      
+        
+        ######################################
+        images = data["image"].to(device)
+        labels = data["label"].to(device)
+        
+        if isinstance(model, TwoNetworks):
+          IRchannel = images[:, -1, ...]    # selecting IR channel
+          RGBchannel = images[:, :-1, ...]  # selecting RGB channel
+          prediction = model.forward(RGBchannel, IRchannel)
+        elif isinstance(model, SingleNetwork) and not model.weight_init:
+          images = images[:, :-1, ...]
+          output = model.forward(images)
+        else: 
+          output = model.forward(images)
+          
+        loss = criterion(output, labels)
+        losses.append(loss.item())
+        
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        ######################################
+
     return np.mean(losses)
 
 
@@ -45,16 +71,18 @@ def evaluate_meanavgprecision(model, dataloader, criterion, device, numcl):
 
     #TODO model.train() or model.eval()?
 
-    #curcount = 0
-    #accuracy = 0 
-    
+    ###################
+    model.eval()
+    ###################
 
-
+    curcount = 0
+    accuracy = 0 
     
-    concat_pred = np.empty((0, numcl)) #prediction scores for each class. each numpy array is a list of scores. one score per image
+    
+    concat_pred   = np.empty((0, numcl)) #prediction scores for each class. each numpy array is a list of scores. one score per image
     concat_labels = np.empty((0, numcl)) #labels scores for each class. each numpy array is a list of labels. one label per image
-    avgprecs=np.zeros(numcl) #average precision for each class
-    fnames = [] #filenames as they come out of the dataloader
+    avgprecs      = np.zeros(numcl)  # average precision for each class
+    fnames        = [] # filenames as they come out of the dataloader
 
     with torch.no_grad():
       losses = []
@@ -68,20 +96,32 @@ def evaluate_meanavgprecision(model, dataloader, criterion, device, numcl):
 
           loss = criterion(outputs, labels.to(device))
           losses.append(loss.item())
-          
+
+          ######################################
           # This was an accuracy computation
-          # cpuout= outputs.to('cpu')
-          # _, preds = torch.max(cpuout, 1)
-          # labels = labels.float()
-          # corrects = torch.sum(preds == labels.data)
-          # accuracy = accuracy*( curcount/ float(curcount+labels.shape[0]) ) + corrects.float()* ( curcount/ float(curcount+labels.shape[0]) )
-          # curcount+= labels.shape[0]
-          
+          cpu_out = outputs.to('cpu')
+          #_, preds = torch.max(cpuout, 1)
+          _, preds = torch.gt(cpu_out, 0.5).float()  # Check when output probability is greater than 50 % for each class (50 % is a hyperparameter)
+          labels = labels.float()
+          corrects = torch.sum(preds == labels.data)
+          accuracy = accuracy * (curcount / float(curcount + labels.shape[0])) + corrects.float() * (curcount / float(curcount + labels.shape[0]))
+          curcount += labels.shape[0]
+          ######################################
+
           # TODO: collect scores, labels, filenames
           
+          ######################################
+          concat_pred   = np.concatenate((concat_pred,   cpu_out.float()),  axis = 0)   # sklearn.metrics.average_precision_score takes confidence score, i.e. network output not thresholded prediction (?)
+          concat_labels = np.concatenate((concat_labels, labels.float()), axis = 0)
+          fnames.append(data["filename"])
+          ######################################
+
     
-    for c in range(numcl):   
-      avgprecs[c]= # TODO, nope it is not sklearn.metrics.precision_score
+    for c in range(numcl): 
+      #######################################  
+      avgprecs[c] = sklearn.metrics.average_precision_score(concat_labels[:, c], concat_pred[:, c]) # TODO, nope it is not sklearn.metrics.precision_score
+      
+      #######################################  
       
     return avgprecs, np.mean(losses), concat_labels, concat_pred, fnames
 
@@ -89,11 +129,11 @@ def evaluate_meanavgprecision(model, dataloader, criterion, device, numcl):
 def traineval2_model_nocv(dataloader_train, dataloader_test ,  model ,  criterion, optimizer, scheduler, num_epochs, device, numcl):
 
   best_measure = 0
-  best_epoch =-1
+  best_epoch = -1
 
-  trainlosses=[]
-  testlosses=[]
-  testperfs=[]
+  trainlosses = []
+  testlosses  = []
+  testperfs   = []
   
   for epoch in range(num_epochs):
     print('Epoch {}/{}'.format(epoch, num_epochs - 1))
@@ -106,7 +146,7 @@ def traineval2_model_nocv(dataloader_train, dataloader_test ,  model ,  criterio
     if scheduler is not None:
       scheduler.step()
 
-    perfmeasure, testloss,concat_labels, concat_pred, fnames  = evaluate_meanavgprecision(model, dataloader_test, criterion, device, numcl)
+    perfmeasure, testloss, concat_labels, concat_pred, fnames  = evaluate_meanavgprecision(model, dataloader_test, criterion, device, numcl)
     testlosses.append(testloss)
     testperfs.append(perfmeasure)
     
