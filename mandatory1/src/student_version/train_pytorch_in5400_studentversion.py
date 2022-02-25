@@ -45,18 +45,17 @@ def train_epoch(model, trainloader, criterion, device, optimizer):
         ######################################
         images = data["image"].to(device)
         labels = data["label"].to(device)
-        
-        if isinstance(model, TwoNetworks):
-          IRchannel = images[:, -1, ...]    # selecting IR channel
-          RGBchannel = images[:, :-1, ...]  # selecting RGB channel
-          prediction = model.forward(RGBchannel, IRchannel)
-        elif isinstance(model, SingleNetwork) and not model.weight_init:
-          images = images[:, :-1, ...]
+        #if isinstance(model, TwoNetworks):
+        #  IRchannel = images[:, -1, ...]    # selecting IR channel
+        #  RGBchannel = images[:, :-1, ...]  # selecting RGB channel
+        #  prediction = model.forward(RGBchannel, IRchannel)
+        if isinstance(model, SingleNetwork) and not model.weight_init:
+          #images = images[:, :-1, ...]
           output = model.forward(images)
         else: 
           output = model.forward(images)
           
-        loss = criterion(output, labels)
+        loss = criterion(output, labels.float())
         losses.append(loss.item())
         
         optimizer.zero_grad()
@@ -100,8 +99,9 @@ def evaluate_meanavgprecision(model, dataloader, criterion, device, numcl):
           ######################################
           # This was an accuracy computation
           cpu_out = outputs.to('cpu')
+          scores = nn.functional.sigmoid(cpu_out)
           #_, preds = torch.max(cpuout, 1)
-          _, preds = torch.gt(cpu_out, 0.5).float()  # Check when output probability is greater than 50 % for each class (50 % is a hyperparameter)
+          _, preds = torch.gt(scores, 0.5).float()  # Check when output probability is greater than 50 % for each class (50 % is a hyperparameter)
           labels = labels.float()
           corrects = torch.sum(preds == labels.data)
           accuracy = accuracy * (curcount / float(curcount + labels.shape[0])) + corrects.float() * (curcount / float(curcount + labels.shape[0]))
@@ -111,7 +111,7 @@ def evaluate_meanavgprecision(model, dataloader, criterion, device, numcl):
           # TODO: collect scores, labels, filenames
           
           ######################################
-          concat_pred   = np.concatenate((concat_pred,   cpu_out.float()),  axis = 0)   # sklearn.metrics.average_precision_score takes confidence score, i.e. network output not thresholded prediction (?)
+          concat_pred   = np.concatenate((concat_pred,   scores.float()),  axis = 0)   # sklearn.metrics.average_precision_score takes confidence scores, i.e. network confidence output not thresholded prediction (?)
           concat_labels = np.concatenate((concat_labels, labels.float()), axis = 0)
           fnames.append(data["filename"])
           ######################################
@@ -140,7 +140,7 @@ def traineval2_model_nocv(dataloader_train, dataloader_test ,  model ,  criterio
     print('-' * 10)
 
 
-    avgloss=train_epoch(model,  dataloader_train,  criterion,  device , optimizer )
+    avgloss = train_epoch(model,  dataloader_train,  criterion,  device , optimizer )
     trainlosses.append(avgloss)
     
     if scheduler is not None:
@@ -157,9 +157,14 @@ def traineval2_model_nocv(dataloader_train, dataloader_test ,  model ,  criterio
 
     if avgperfmeasure > best_measure: #higher is better or lower is better?
       bestweights= model.state_dict()
+      ####################################
       #TODO track current best performance measure and epoch
-      
+
+      best_measure = avgperfmeasure
+      best_epoch   = epoch
+
       #TODO save your scores
+      ####################################
 
   return best_epoch, best_measure, bestweights, trainlosses, testlosses, testperfs
 
@@ -186,16 +191,16 @@ class yourloss(nn.modules.loss._Loss):
       Tensor
           Binary cross-entropy loss with sigmoid logits of the multi-class, multi-label, dataset.
       """
-        #TODO
-        ################################################################
-        loss_criterion = nn.BCEwithLogitsLoss(reduction = "mean")
-        loss = loss_criterion(input_, target)
-        ################################################################
-        return loss
+      #TODO
+      ################################################################
+      loss_criterion = nn.BCEWithLogitsLoss(reduction = self.reduction)
+      loss = loss_criterion(input_, target)
+      ################################################################
+      return loss
 
 def runstuff():
   config = dict()
-  config['use_gpu'] = False #True #TODO change this to True for training on the cluster
+  config['use_gpu'] = True #True #TODO change this to True for training on the cluster
   config['lr'] = 0.005
   config['batchsize_train'] = 32
   config['batchsize_val'] = 64
@@ -213,6 +218,7 @@ def runstuff():
           transforms.RandomCrop(224),
           transforms.RandomHorizontalFlip(),
           transforms.ToTensor(),
+          ChannelSelect().forward,
           transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
       ]),
       'val': transforms.Compose([
@@ -220,6 +226,7 @@ def runstuff():
           transforms.CenterCrop(224),
           transforms.RandomHorizontalFlip(),
           transforms.ToTensor(),
+          ChannelSelect().forward,
           transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
       ]),
   }
@@ -235,6 +242,7 @@ def runstuff():
   image_datasets['train'] = RainforestDataset(root_dir = data_root_dir, trvaltest=0, transform = data_transforms['train'])
   image_datasets['val']   = RainforestDataset(root_dir = data_root_dir, trvaltest=1, transform = data_transforms['val'])
 
+  
   # Dataloaders
   #TODO use num_workers=1
 
@@ -244,7 +252,6 @@ def runstuff():
   dataloaders['val']   = DataLoader(image_datasets['val'],   batch_size = config["batchsize_val"],     shuffle = True, num_workers = 1) #
 
   ###################################
-
   # Device
   if True == config['use_gpu']:
       device= torch.device('cuda:0')
@@ -258,12 +265,12 @@ def runstuff():
   pretrained_resnet18 = models.resnet18(pretrained = True)
 
   #model = # TwoNetworks()
-  model = SingleNetwork(pretrained_resnet18, weight_init = "kaiminghe")
+  model = SingleNetwork(pretrained_resnet18)#, weight_init = "kaiminghe")
   ####################################
 
   model = model.to(device)
 
-  lossfct = yourloss()
+  lossfct = yourloss().forward
   
   #######################################################################
   #TODO
@@ -274,9 +281,7 @@ def runstuff():
   # Decay LR by a factor of 0.3 every X epochs
   #TODO
 
-  every_x_epochs = 5 # Hyperparameter
-
-  somelr_scheduler = lr_scheduler.StepLR(someoptimizer, factor = config['scheduler_factor'], step_size = config['scheduler_stepsize'])
+  somelr_scheduler = lr_scheduler.StepLR(someoptimizer, gamma = config['scheduler_factor'], step_size = config['scheduler_stepsize'])
 
   #######################################################################
 

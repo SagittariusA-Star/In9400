@@ -47,6 +47,7 @@ class SingleNetwork(nn.Module):
 
         _, num_classes = get_classes_list()
 
+        self.weight_init = weight_init
 
         if weight_init is not None:
             # TODO Here we want an additional channel in the weights tensor, specifically in the first
