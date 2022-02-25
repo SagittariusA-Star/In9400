@@ -55,7 +55,7 @@ def train_epoch(model, trainloader, criterion, device, optimizer):
         else: 
           output = model.forward(images)
           
-        loss = criterion(output, labels.float())
+        loss = criterion(output.float(), labels.float())
         losses.append(loss.item())
         
         optimizer.zero_grad()
@@ -99,9 +99,10 @@ def evaluate_meanavgprecision(model, dataloader, criterion, device, numcl):
           ######################################
           # This was an accuracy computation
           cpu_out = outputs.to('cpu')
-          scores = nn.functional.sigmoid(cpu_out)
+          scores = torch.sigmoid(cpu_out)
           #_, preds = torch.max(cpuout, 1)
-          _, preds = torch.gt(scores, 0.5).float()  # Check when output probability is greater than 50 % for each class (50 % is a hyperparameter)
+          preds = torch.gt(scores, 0.5).float()  # Check when output probability is greater than 50 % for each class (50 % is a hyperparameter)
+
           labels = labels.float()
           corrects = torch.sum(preds == labels.data)
           accuracy = accuracy * (curcount / float(curcount + labels.shape[0])) + corrects.float() * (curcount / float(curcount + labels.shape[0]))
@@ -173,6 +174,8 @@ class yourloss(nn.modules.loss._Loss):
 
     def __init__(self, reduction: str = 'mean') -> None:
         #TODO
+        super(yourloss, self).__init__(reduction)
+
         self.reduction = reduction
         
     def forward(self, input_: Tensor, target: Tensor) -> Tensor:
@@ -202,7 +205,7 @@ def runstuff():
   config = dict()
   config['use_gpu'] = True #True #TODO change this to True for training on the cluster
   config['lr'] = 0.005
-  config['batchsize_train'] = 32
+  config['batchsize_train'] = 16
   config['batchsize_val'] = 64
   config['maxnumepochs'] = 35
   config['scheduler_stepsize'] = 10

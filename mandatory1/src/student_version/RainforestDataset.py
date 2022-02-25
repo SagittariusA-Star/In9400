@@ -78,14 +78,13 @@ class RainforestDataset(Dataset):
 
         #########################
 
-        data_train, data_val, label_train, label_val = train_test_split(img_name, self.labels, test_size = 0.33, random_state = 0)
+        data_train, data_val, label_train, label_val = train_test_split(img_name, self.labels, test_size = 0.66, random_state = 0)
         if trvaltest == 0:      # Training mode
             self.img_filenames = list(data_train)
-            self.labels   = list(label_train)
+            self.labels   = np.array(label_train).astype(np.float32)
         else:                   # Validation and "test" (since we sloppily mix these to according to the exerciese text) mode
             self.img_filenames = list(data_val)
-            self.labels   = list(label_val)
-
+            self.labels   = np.array(label_val).astype(np.float32)
         #########################
 
 
@@ -100,13 +99,7 @@ class RainforestDataset(Dataset):
         labels = self.labels[idx]
         
         with PIL.Image.open(self.root_dir + "train-tif-v2/" + self.img_filenames[idx] + ".tif") as img:
-            #img = np.asarray(img).astype(np.uint8)
-        
-            
-            #print(np.asfarray(img, dtype = np.uint8).shape)
-            #print(np.asfarray(img).astype(np.uint8).dtype)
-
-
+   
             if self.transform:
                 img = self.transform(img)
             #########################
