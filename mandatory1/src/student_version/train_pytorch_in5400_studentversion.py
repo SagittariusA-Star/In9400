@@ -95,9 +95,6 @@ def evaluate_meanavgprecision(model, dataloader, criterion, device, numcl):
           images = data['image'].to(device)        
           labels = data['label']
 
-          loss = criterion(outputs, labels.to(device))
-          losses.append(loss.item())
-
           ######################################
           # This was an accuracy computation
 
@@ -110,7 +107,10 @@ def evaluate_meanavgprecision(model, dataloader, criterion, device, numcl):
             outputs = model.forward(images)
           else: 
             outputs = model.forward(images)
-            
+          
+          loss = criterion(outputs, labels.to(device))
+          losses.append(loss.item())
+
           cpu_out = outputs.to('cpu')
           scores = torch.sigmoid(cpu_out)
           #_, preds = torch.max(cpuout, 1)
@@ -427,7 +427,7 @@ def runstuff():
   ###########################################################################################
   #####                                     Task 1                                      #####
   ###########################################################################################
-  """
+
   best_epoch, best_measure, bestweights, trainlosses, \
   testlosses, testperfs, concat_labels, concat_pred, fnames, classwiseperf \
   = traineval2_model_nocv(dataloaders['train'], dataloaders['val'] ,  model ,  lossfct, someoptimizer, somelr_scheduler, num_epochs= config['maxnumepochs'], device = device , numcl = config['numcl'] )
@@ -446,11 +446,10 @@ def runstuff():
   
 
   torch.save(bestweights, "bestweights_task1.pt")
-  """
+
   ###########################################################################################
   #####                                    Task 3                                       #####
   ###########################################################################################
-
 
   data_transforms = {
       'train': transforms.Compose([

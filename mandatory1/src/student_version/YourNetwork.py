@@ -128,7 +128,6 @@ class SingleNetwork(nn.Module):
 
         outfeatures = pretrained_net.fc.in_features
         pretrained_net.fc = nn.Linear(outfeatures, 17, bias = True)      # Overwriting last fully connected layer to accomodate for 17 output classes 
-
         #############################
 
         self.net = pretrained_net
