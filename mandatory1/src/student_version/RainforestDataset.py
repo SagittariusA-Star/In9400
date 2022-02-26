@@ -39,7 +39,7 @@ class ChannelSelect(torch.nn.Module):
         return img[self.channels, ...]
 
     def __repr__(self):
-        return self.__class__.__name__ + '(p={})'.format(self.p)
+        return self.__class__.__name__ + '(p={})'.format(self.channels)
 
 
 class RainforestDataset(Dataset):
@@ -78,7 +78,7 @@ class RainforestDataset(Dataset):
 
         #########################
 
-        data_train, data_val, label_train, label_val = train_test_split(img_name, self.labels, test_size = 0.66, random_state = 0)
+        data_train, data_val, label_train, label_val = train_test_split(img_name, self.labels, test_size = 0.33, random_state = 0)
         if trvaltest == 0:      # Training mode
             self.img_filenames = list(data_train)
             self.labels   = np.array(label_train).astype(np.float32)
@@ -99,10 +99,11 @@ class RainforestDataset(Dataset):
         labels = self.labels[idx]
         
         with PIL.Image.open(self.root_dir + "train-tif-v2/" + self.img_filenames[idx] + ".tif") as img:
-   
+            
             if self.transform:
                 img = self.transform(img)
-            #########################
+
+        #########################
 
             sample = {'image': img,
                     'label': labels,
