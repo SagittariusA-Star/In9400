@@ -112,7 +112,7 @@ def evaluate_meanavgprecision(model, dataloader, criterion, device, numcl):
           losses.append(loss.item())
 
           cpu_out = outputs.to('cpu')
-          scores = torch.sigmoid(cpu_out)
+          scores = torch.sigmoid(cpu_out)   # Transform model output from real numbers to probability space [0, 1]
           #_, preds = torch.max(cpuout, 1)
           preds = torch.gt(scores, 0.5).float()  # Check when output probability is greater than 50 % for each class (50 % is a hyperparameter)
 
@@ -427,7 +427,8 @@ def runstuff():
   ###########################################################################################
   #####                                     Task 1                                      #####
   ###########################################################################################
-
+  """
+  print("SingleNetwork RGB:"); t0 = time.time()
   best_epoch, best_measure, bestweights, trainlosses, \
   testlosses, testperfs, concat_labels, concat_pred, fnames, classwiseperf \
   = traineval2_model_nocv(dataloaders['train'], dataloaders['val'] ,  model ,  lossfct, someoptimizer, somelr_scheduler, num_epochs= config['maxnumepochs'], device = device , numcl = config['numcl'] )
@@ -446,10 +447,14 @@ def runstuff():
   
 
   torch.save(bestweights, "bestweights_task1.pt")
+  print("Time:", time.time() - t0, "sec"); t0 = time.time()
+  """ 
 
   ###########################################################################################
   #####                                    Task 3                                       #####
   ###########################################################################################
+
+  print("TwoNetworks:"); t0 = time.time()
 
   data_transforms = {
       'train': transforms.Compose([
@@ -505,11 +510,13 @@ def runstuff():
   
 
   torch.save(bestweights, "bestweights_task3.pt")
+  print("Time:", time.time() - t0, "sec"); t0 = time.time()
 
   ###########################################################################################
   #####                                    Task 4                                       #####
   ###########################################################################################
 
+  print("SingleNetwork RGBIr:"); t0 = time.time()
 
   model = SingleNetwork(pretrained_resnet18, weight_init = "kaiminghe")
   model = model.to(device)
@@ -532,6 +539,7 @@ def runstuff():
   
 
   torch.save(bestweights, "bestweights_task4.pt")
+  print("Time:", time.time() - t0, "sec"); t0 = time.time()
 
 
 if __name__=='__main__':
