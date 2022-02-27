@@ -57,12 +57,18 @@ class RainforestDataset(Dataset):
         
         dataframe = pd.read_csv(root_dir + "train_v2.csv")
         img_name  = dataframe.iloc[:, 0]
+
         labels         = dataframe.iloc[:, 1]
         labels         = [string.split() for string in labels]
 
         binarizer      = preprocessing.MultiLabelBinarizer()
 
         self.labels    = binarizer.fit_transform(labels) 
+
+        ### FOR DEBUGGING ###
+        #img_name = img_name[:150]
+        #self.labels = self.labels[:150]
+
         #########################
 
         # TODO Perform a test train split. It's recommended to use sklearn's train_test_split with the following

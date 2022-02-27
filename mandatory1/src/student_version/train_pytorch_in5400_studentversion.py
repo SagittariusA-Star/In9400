@@ -57,7 +57,9 @@ def train_epoch(model, trainloader, criterion, device, optimizer):
           output = model(images)
         else: 
           output = model(images)
-          
+        
+        #print("print train", output.cpu())
+        
         loss = criterion(output.float(), labels.float())
         losses.append(loss.item())
         
@@ -113,6 +115,7 @@ def evaluate_meanavgprecision(model, dataloader, criterion, device, numcl):
 
           cpu_out = outputs.to('cpu')
           scores = torch.sigmoid(cpu_out)   # Transform model output from real numbers to probability space [0, 1]
+          
           #_, preds = torch.max(cpuout, 1)
           preds = torch.gt(scores, 0.5).float()  # Check when output probability is greater than 50 % for each class (50 % is a hyperparameter)
 
@@ -128,7 +131,6 @@ def evaluate_meanavgprecision(model, dataloader, criterion, device, numcl):
           concat_pred   = np.concatenate((concat_pred,   scores.float()),  axis = 0)   # sklearn.metrics.average_precision_score takes confidence scores, i.e. network confidence output not thresholded prediction (?)
           concat_labels = np.concatenate((concat_labels, labels.float()), axis = 0)
           fnames.append(data["filename"])
-          
 
           ######################################
 
@@ -182,7 +184,7 @@ def traineval2_model_nocv(dataloader_train, dataloader_test ,  model ,  criterio
 
       #TODO save your scores
       ####################################
-      best_scores = concat_labels
+      best_scores = concat_pred
       best_labels = concat_labels
       best_fnames = fnames
 
@@ -221,121 +223,6 @@ class yourloss(nn.modules.loss._Loss):
       return loss
 
 
-def evaluate_diagnostics(classwise_perf, concat_labels, concat_pred, root_dir, \
-                        fnames, trainlosses, testlosses, testperfs, num_epochs):
-  
-  idx_highAP = np.argmax(classwise_perf)
-  pred   = concat_pred[:, idx_highAP] 
-  label  = concat_labels[:, idx_highAP]
-
-  idx_sorted = np.argsort(pred)
-
-  pred  = pred[idx_sorted]
-  label = label[idx_sorted]
-  fnames = fnames[idx_sorted]
-
-  label_names, ncls = get_classes_list()
-  class_num = np.arange(ncls)
-  
-  print("------------------------------------------------")
-  print(f"Highest AP class: {label_names[idx_highAP]}")
-  print(f"Top-10: {pred[:10]}") 
-  print(f"Bottom-10: {pred[:10]}") 
-  print("------------------------------------------------")
-
-
-  fonts = {
-    "font.family": "serif",
-    "axes.labelsize": 20,
-    "font.size": 20,
-    "legend.fontsize": 20,
-    "xtick.labelsize": 20,
-    "ytick.labelsize": 20
-    }
-  plt.rcParams.update(fonts)
-
-  fig, ax = plt.subplots(figsize = (16, 10))
-  
-  ax.plot(class_num, classwise_perf)
-  ax.scatter(idx_highAP, np.max(classwise_perf), label = "Max AP")
-  ax.set_xticks(class_num)
-  ax.set_xticklabels(label_names, rotation = "vertical")
-  ax.set_xlabel("Class labels")
-  ax.set_ylabel("Average precision")
-  ax.grid()
-  ax.legend()
-
-
-  ts = np.linspace(0, np.max(pred), 10)
-
-  tailac = tail_accuracy(ts, concat_pred, concat_labels)
-
-  fig, ax = plt.subplots(figsize = (16, 10))
-  ax.plot(ts, tailac)
-  ax.set_xlabel("Acceptance threshold t")
-  ax.set_ylabel("Tail accuracy")
-  ax.grid()
-  ax.legend([f"AP({label_names[i]}) = {classwise_perf[i]}" for i in range(ncls)])
-
-
-
-  figt, axt = plt.subplots(2, 5, figsize = (16, 10))  # Figure and axis for top-10 images
-  figb, axb = plt.subplots(2, 5, figsize = (16, 10))  # Figure and axis for bottom-10 images
-  
-  figt.suptitle(f"Top-10 | Label: {label_names[idx_highAP]}")
-  figb.suptitle(f"Bottom-10 | Label: {label_names[idx_highAP]}")
-  for i in range(2):
-    for j in range(5):
-      idx = i * 2 + j 
-
-      with PIL.Image.open(root_dir + "train-tif-v2/" + fnames[idx] + ".tif") as img:
-        img = np.asarray(img)
-        axt[i, j].imshow(img[..., :3])
-
-        classname = label_names[label[idx].astype(bool)]
-        axt[i, j].set_title(f"Score: {pred[idx]} | Label: {classname}")
-        plt.axis("off")
-
-      with PIL.Image.open(root_dir + "train-tif-v2/" + fnames[-idx] + ".tif") as img:
-        img = np.asarray(img)
-        axb[i, j].imshow(img[..., :3])
-
-        classname = label_names[label[-idx].astype(bool)]
-        axb[i, j].set_title(f"Score: {pred[-idx]} | Label: {classname}")
-        plt.axis("off")
-
-  fig, ax = plt.subplots(2, 1, figsize = (16, 10))
-  ax[0].plot(np.arange(num_epochs), trainlosses, label = "Train")
-  ax[0].plot(np.arange(num_epochs), testlosses,  label = "Test")
-  ax[0].set_xlabel("Epoch")
-  ax[0].set_ylabel("Loss")
-  ax[0].grid()
-  ax[0].legend()
-
-  ax[1].plot(np.arange(num_epochs), np.mean(testperfs, axis = 1))
-  ax[1].plot(np.arange(num_epochs), testperfs)
-  ax[1].set_xlabel("Epoch")
-  ax[1].set_ylabel("AP")
-  ax[1].grid()
-  legend = ["mAP"]
-  ax[1].legend(legend + [f"AP({label_names[i]})" for i in range(ncls)])
-
-  plt.show()
-
-
-
-def tail_accuracy(ts, pred, label):
-
-  correct = pred[:, :, np.newaxis] > ts[np.newaxis, np.newaxis, :]
-  correct *= pred == label[:, :, np.newaxis]
-
-  tailac = np.sum(correct , axis = 1)
-  tailac /= np.sum(pred[:, :, np.newaxis] > ts[np.newaxis, np.newaxis, :], axis = 1)
-
-  return tailac
-
-
-
 def runstuff():
   config = dict()
   config['use_gpu'] = True #True #TODO change this to True for training on the cluster
@@ -345,7 +232,7 @@ def runstuff():
   config['maxnumepochs'] = 35
   config['scheduler_stepsize'] = 10
   config['scheduler_factor'] = 0.3
-  config["num_workers"]      = 10
+  config["num_workers"]      = 1
 
   # This is a dataset property.
   config['numcl'] = 17
@@ -427,11 +314,12 @@ def runstuff():
   ###########################################################################################
   #####                                     Task 1                                      #####
   ###########################################################################################
-  """
+  
   print("SingleNetwork RGB:"); t0 = time.time()
   best_epoch, best_measure, bestweights, trainlosses, \
   testlosses, testperfs, concat_labels, concat_pred, fnames, classwiseperf \
   = traineval2_model_nocv(dataloaders['train'], dataloaders['val'] ,  model ,  lossfct, someoptimizer, somelr_scheduler, num_epochs= config['maxnumepochs'], device = device , numcl = config['numcl'] )
+  
 
   with h5py.File("diagnostics_task1.h5", "w") as outfile: 
     outfile.create_dataset("best_epoch", data = best_epoch)
@@ -448,7 +336,7 @@ def runstuff():
 
   torch.save(bestweights, "bestweights_task1.pt")
   print("Time:", time.time() - t0, "sec"); t0 = time.time()
-  """ 
+  
 
   ###########################################################################################
   #####                                    Task 3                                       #####
