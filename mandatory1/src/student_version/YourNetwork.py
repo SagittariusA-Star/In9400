@@ -10,7 +10,7 @@ class TwoNetworks(nn.Module):
 
     functions: forward
     '''
-    def __init__(self, pretrained_net1, pretrained_net2):
+    def __init__(self, pretrained_net1, pretrained_net2, freeze = False):
         super(TwoNetworks, self).__init__()
 
         _, num_classes = get_classes_list()
@@ -29,7 +29,7 @@ class TwoNetworks(nn.Module):
         nout, nin, nx, ny = current_weights.shape               
         new_weights = torch.zeros((nout, 1, nx, ny))            # Setting up zeros tensor for new weights to accomodate for the IR channel in the input images            
 
-        nn.init.kaiming_uniform_(new_weights)  # Kaiming He initialization of zeros weights tensor
+        nn.init.kaiming_normal_(new_weights, nonlinearity = "relu")  # Kaiming He initialization of zeros weights tensor
 
         pretrained_net2.conv1 = nn.Conv2d(1, out_channels, 
                                         kernel_size = pretrained_net2.conv1.kernel_size,
@@ -47,6 +47,13 @@ class TwoNetworks(nn.Module):
         outfeatures1 = pretrained_net1.fc.in_features
         outfeatures2 = pretrained_net2.fc.in_features
         self.linear = nn.Linear(outfeatures1 + outfeatures2, num_classes)       # Double number of output features since we concatinate RGB and IR results before fully conenncted layer
+        
+        if freeze:
+            for param in list(self.fully_conv1.parameters())[1:]:
+                param.requires_grad = False
+            for param in list(self.fully_conv2.parameters())[1:]:
+                param.requires_grad = False
+
         self.flatten = nn.Flatten()
 
     def forward(self, inputs1, inputs2):
@@ -70,7 +77,7 @@ class SingleNetwork(nn.Module):
     functions: forward
     '''
 
-    def __init__(self, pretrained_net, weight_init = None):
+    def __init__(self, pretrained_net, weight_init = None, freeze = False):
         super(SingleNetwork, self).__init__()
 
         _, num_classes = get_classes_list()
@@ -87,7 +94,7 @@ class SingleNetwork(nn.Module):
             out_channels    = pretrained_net.conv1.out_channels     # Extracting number of output channels of first convolutional layer in default pretrained network (ResNet 18)
 
             nout, nin, nx, ny = current_weights.shape               
-            new_weights = torch.zeros((nout, 4, nx, ny))            # Setting up zeros tensor for new weights to accomodate for the IR channel in the input images            
+            new_weights = torch.empty((nout, 4, nx, ny))            # Setting up zeros tensor for new weights to accomodate for the IR channel in the input images            
 
 
             ############################
@@ -97,7 +104,7 @@ class SingleNetwork(nn.Module):
                 
                 ###########################
 
-                nn.init.kaiming_uniform_(new_weights[-1, ...])  # Kaiming He initialization of zeros weights tensor
+                nn.init.kaiming_normal_(new_weights, nonlinearity = "relu")  # Kaiming He initialization of zeros weights tensor
 
                 ###########################
 
@@ -109,7 +116,7 @@ class SingleNetwork(nn.Module):
 
             ###########################
 
-            new_weights[:, :-1, :, :] = current_weights     # Copying RBG channel weights to new weights tensor
+            new_weights[:, :3, :, :] = current_weights     # Copying RBG channel weights to new weights tensor
 
             pretrained_net.conv1 = nn.Conv2d(4, out_channels, 
                                             kernel_size = pretrained_net.conv1.kernel_size,
@@ -125,9 +132,13 @@ class SingleNetwork(nn.Module):
         # TODO Overwrite the last linear layer.
         
         #############################
+        if freeze:
+            for param in list(pretrained_net.parameters())[1:-1]:
+                param.requires_grad = False
 
         outfeatures = pretrained_net.fc.in_features
-        pretrained_net.fc = nn.Linear(outfeatures, 17, bias = True)      # Overwriting last fully connected layer to accomodate for 17 output classes 
+        pretrained_net.fc = nn.Linear(outfeatures, num_classes, bias = True)      # Overwriting last fully connected layer to accomodate for 17 output classes 
+        
         #############################
 
         self.net = pretrained_net

@@ -66,8 +66,8 @@ class RainforestDataset(Dataset):
         self.labels    = binarizer.fit_transform(labels) 
 
         ### FOR DEBUGGING ###
-        #img_name = img_name[:150]
-        #self.labels = self.labels[:150]
+        #img_name = img_name[:1500]
+        #self.labels = self.labels[:1500]
 
         #########################
 

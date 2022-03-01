@@ -79,8 +79,8 @@ def evaluate_meanavgprecision(model, dataloader, criterion, device, numcl):
     model.eval()
     ###################
 
-    curcount = 0
-    accuracy = 0 
+    #curcount = 0
+    #accuracy = 0 
     
     
     concat_pred   = np.empty((0, numcl)) #prediction scores for each class. each numpy array is a list of scores. one score per image
@@ -117,12 +117,12 @@ def evaluate_meanavgprecision(model, dataloader, criterion, device, numcl):
           scores = torch.sigmoid(cpu_out)   # Transform model output from real numbers to probability space [0, 1]
           
           #_, preds = torch.max(cpuout, 1)
-          preds = torch.gt(scores, 0.5).float()  # Check when output probability is greater than 50 % for each class (50 % is a hyperparameter)
+          #preds = torch.gt(scores, 0.5).float()  # Check when output probability is greater than 50 % for each class (50 % is a hyperparameter)
 
           labels = labels.float()
-          corrects = torch.sum(preds == labels.data)
-          accuracy = accuracy * (curcount / float(curcount + labels.shape[0])) + corrects.float() * (curcount / float(curcount + labels.shape[0]))
-          curcount += labels.shape[0]
+          #corrects = torch.sum(preds == labels.data)
+          #accuracy = accuracy * (curcount / float(curcount + labels.shape[0])) + corrects.float() * (curcount / float(curcount + labels.shape[0]))
+          #curcount += labels.shape[0]
           ######################################
 
           # TODO: collect scores, labels, filenames
@@ -145,7 +145,7 @@ def evaluate_meanavgprecision(model, dataloader, criterion, device, numcl):
     return avgprecs, np.mean(losses), concat_labels, concat_pred, fnames
 
 
-def traineval2_model_nocv(dataloader_train, dataloader_test ,  model ,  criterion, optimizer, scheduler, num_epochs, device, numcl):
+def traineval2_model_nocv(dataloader_train, dataloader_test, model,  criterion, optimizer, scheduler, num_epochs, device, numcl):
 
   best_measure = 0
   best_epoch = -1
@@ -164,6 +164,9 @@ def traineval2_model_nocv(dataloader_train, dataloader_test ,  model ,  criterio
     
     if scheduler is not None:
       scheduler.step()
+      ##################################
+      print("Current learning rate:", scheduler.get_last_lr()[0])
+      ##################################
 
     perfmeasure, testloss, concat_labels, concat_pred, fnames  = evaluate_meanavgprecision(model, dataloader_test, criterion, device, numcl)
     testlosses.append(testloss)
@@ -172,15 +175,16 @@ def traineval2_model_nocv(dataloader_train, dataloader_test ,  model ,  criterio
     print('at epoch: ', epoch,' classwise perfmeasure ', perfmeasure)
     
     avgperfmeasure = np.mean(perfmeasure)
-    print('at epoch: ', epoch,' avgperfmeasure ', avgperfmeasure)
+    print('at epoch: ', epoch,' avgperfmeasure: ', avgperfmeasure, "test loss:", testloss)
 
     if avgperfmeasure > best_measure: #higher is better or lower is better?
-      bestweights= model.state_dict()
+      bestweights = model.state_dict()
       ####################################
       #TODO track current best performance measure and epoch
 
       best_measure = avgperfmeasure
       best_epoch   = epoch
+      best_perfmeasure = perfmeasure 
 
       #TODO save your scores
       ####################################
@@ -188,7 +192,8 @@ def traineval2_model_nocv(dataloader_train, dataloader_test ,  model ,  criterio
       best_labels = concat_labels
       best_fnames = fnames
 
-  return best_epoch, best_measure, bestweights, trainlosses, testlosses, testperfs, best_labels, best_scores, best_fnames, perfmeasure
+
+  return best_epoch, best_measure, bestweights, trainlosses, testlosses, testperfs, best_labels, best_scores, best_fnames, best_perfmeasure
 
 
 class yourloss(nn.modules.loss._Loss):
@@ -226,13 +231,20 @@ class yourloss(nn.modules.loss._Loss):
 def runstuff():
   config = dict()
   config['use_gpu'] = True #True #TODO change this to True for training on the cluster
-  config['lr'] = 0.005
+  config['lr'] = 0.05
   config['batchsize_train'] = 16
   config['batchsize_val'] = 64
   config['maxnumepochs'] = 35
   config['scheduler_stepsize'] = 10
   config['scheduler_factor'] = 0.3
   config["num_workers"]      = 1
+  config["seed"]             = 774663
+  config["freeze_layers"]    = False # Whether to freeze middle layers of pretrained networks
+
+  ########################################
+  torch.manual_seed(config["seed"])
+  torch.cuda.manual_seed(config["seed"])
+  ########################################
 
   # This is a dataset property.
   config['numcl'] = 17
@@ -245,7 +257,7 @@ def runstuff():
           transforms.RandomHorizontalFlip(),
           transforms.ToTensor(),
           ChannelSelect(),
-          transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+          transforms.Normalize([0.7476, 0.6534, 0.4757], [0.1677, 0.1828, 0.2137])
       ]),
       'val': transforms.Compose([
           transforms.Resize(224),
@@ -253,7 +265,7 @@ def runstuff():
           transforms.RandomHorizontalFlip(),
           transforms.ToTensor(),
           ChannelSelect(),
-          transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+          transforms.Normalize([0.7476, 0.6534, 0.4757], [0.1677, 0.1828, 0.2137])
       ]),
   }
 
@@ -274,8 +286,8 @@ def runstuff():
 
   ###################################
   dataloaders = {}
-  dataloaders['train'] = DataLoader(image_datasets['train'], batch_size = config["batchsize_train"],   shuffle = False, num_workers = config["num_workers"]) # Shuffle to False to ensure reproducability by TAs
-  dataloaders['val']   = DataLoader(image_datasets['val'],   batch_size = config["batchsize_val"],     shuffle = False, num_workers = config["num_workers"]) 
+  dataloaders['train'] = DataLoader(image_datasets['train'], batch_size = config["batchsize_train"],   shuffle = True, num_workers = config["num_workers"]) # Shuffle to False to ensure reproducability by TAs
+  dataloaders['val']   = DataLoader(image_datasets['val'],   batch_size = config["batchsize_val"],     shuffle = True, num_workers = config["num_workers"]) 
 
   ###################################
   # Device
@@ -290,7 +302,7 @@ def runstuff():
   ####################################
   pretrained_resnet18 = models.resnet18(pretrained = True)
 
-  model = SingleNetwork(pretrained_resnet18)#, weight_init = "kaiminghe")
+  model = SingleNetwork(pretrained_resnet18, freeze = config["freeze_layers"])
   ####################################
 
   model = model.to(device)
@@ -318,10 +330,10 @@ def runstuff():
   print("SingleNetwork RGB:"); t0 = time.time()
   best_epoch, best_measure, bestweights, trainlosses, \
   testlosses, testperfs, concat_labels, concat_pred, fnames, classwiseperf \
-  = traineval2_model_nocv(dataloaders['train'], dataloaders['val'] ,  model ,  lossfct, someoptimizer, somelr_scheduler, num_epochs= config['maxnumepochs'], device = device , numcl = config['numcl'] )
+  = traineval2_model_nocv(dataloaders['train'], dataloaders['val'], model,  lossfct, someoptimizer, somelr_scheduler, num_epochs= config['maxnumepochs'], device = device , numcl = config['numcl'] )
   
-
-  with h5py.File("diagnostics_task1.h5", "w") as outfile: 
+  
+  with h5py.File("diagnostics_task1_higherlr.h5", "w") as outfile: 
     outfile.create_dataset("best_epoch", data = best_epoch)
     outfile.create_dataset("best_measure", data = best_measure)
     outfile.create_dataset("trainlosses", data = trainlosses)
@@ -330,18 +342,29 @@ def runstuff():
     outfile.create_dataset("concat_labels", data = concat_labels)
     outfile.create_dataset("concat_pred", data = concat_pred)
     outfile.create_dataset("classwise_perf", data = classwiseperf)
+    dt = h5py.special_dtype(vlen=str)
+    outfile.create_dataset("filenames", data = np.array(fnames, dtype = dt))
+    outfile.create_dataset("hyperparameters/use_gpu", data = config["use_gpu"])
+    outfile.create_dataset("hyperparameters/learning_rate", data = config["lr"])
+    outfile.create_dataset("hyperparameters/batchsize_train", data = config["batchsize_train"])
+    outfile.create_dataset("hyperparameters/batchsize_val", data = config["batchsize_val"])
+    outfile.create_dataset("hyperparameters/maxnumepochs", data = config["maxnumepochs"])
+    outfile.create_dataset("hyperparameters/scheduler_stepsize", data = config["scheduler_stepsize"])
+    outfile.create_dataset("hyperparameters/scheduler_factor", data = config["scheduler_factor"])
+    outfile.create_dataset("hyperparameters/num_workers", data = config["num_workers"])
+    outfile.create_dataset("hyperparameters/seed", data = config["seed"])
 
-  np.save("fnames_task1", np.array(fnames))
-  
+    outfile.create_dataset("hyperparameters/freeze_layers", data = config["freeze_layers"])
 
-  torch.save(bestweights, "bestweights_task1.pt")
+  torch.save(bestweights, "bestweights_task1_higherlr.pt")
   print("Time:", time.time() - t0, "sec"); t0 = time.time()
   
-
+  
   ###########################################################################################
   #####                                    Task 3                                       #####
   ###########################################################################################
-
+  
+  
   print("TwoNetworks:"); t0 = time.time()
 
   data_transforms = {
@@ -373,18 +396,23 @@ def runstuff():
 
   ###################################
   dataloaders = {}
-  dataloaders['train'] = DataLoader(image_datasets['train'], batch_size = config["batchsize_train"],   shuffle = False, num_workers = config["num_workers"]) # Shuffle to False to ensure reproducability by TAs
-  dataloaders['val']   = DataLoader(image_datasets['val'],   batch_size = config["batchsize_val"],     shuffle = False, num_workers = config["num_workers"]) 
+  dataloaders['train'] = DataLoader(image_datasets['train'], batch_size = config["batchsize_train"],   shuffle = True, num_workers = config["num_workers"]) # Shuffle to False to ensure reproducability by TAs
+  dataloaders['val']   = DataLoader(image_datasets['val'],   batch_size = config["batchsize_val"],     shuffle = True, num_workers = config["num_workers"]) 
 
-
-  model = TwoNetworks(pretrained_resnet18, pretrained_resnet18)
+  pretrained_resnet18_1 = models.resnet18(pretrained = True)
+  pretrained_resnet18_2 = models.resnet18(pretrained = True)
+  model = TwoNetworks(pretrained_resnet18_1, pretrained_resnet18_2, freeze = config["freeze_layers"])
   model = model.to(device)
+
+  someoptimizer = optim.SGD(model.parameters(), lr = config['lr'])
+
+  somelr_scheduler = lr_scheduler.StepLR(someoptimizer, gamma = config['scheduler_factor'], step_size = config['scheduler_stepsize'])
 
   best_epoch, best_measure, bestweights, trainlosses, \
   testlosses, testperfs, concat_labels, concat_pred, fnames, classwiseperf \
   = traineval2_model_nocv(dataloaders['train'], dataloaders['val'] ,  model ,  lossfct, someoptimizer, somelr_scheduler, num_epochs= config['maxnumepochs'], device = device , numcl = config['numcl'] )
 
-  with h5py.File("diagnostics_task3.h5", "w") as outfile: 
+  with h5py.File("diagnostics_task3_higherlr.h5", "w") as outfile: 
     outfile.create_dataset("best_epoch", data = best_epoch)
     outfile.create_dataset("best_measure", data = best_measure)
     outfile.create_dataset("trainlosses", data = trainlosses)
@@ -393,27 +421,75 @@ def runstuff():
     outfile.create_dataset("concat_labels", data = concat_labels)
     outfile.create_dataset("concat_pred", data = concat_pred)
     outfile.create_dataset("classwise_perf", data = classwiseperf)
-
-  np.save("fnames_task3", np.array(fnames))
+    dt = h5py.special_dtype(vlen=str)
+    outfile.create_dataset("filenames", data = np.array(fnames, dtype = dt))
+    outfile.create_dataset("hyperparameters/use_gpu", data = config["use_gpu"])
+    outfile.create_dataset("hyperparameters/learning_rate", data = config["lr"])
+    outfile.create_dataset("hyperparameters/batchsize_train", data = config["batchsize_train"])
+    outfile.create_dataset("hyperparameters/batchsize_val", data = config["batchsize_val"])
+    outfile.create_dataset("hyperparameters/maxnumepochs", data = config["maxnumepochs"])
+    outfile.create_dataset("hyperparameters/scheduler_stepsize", data = config["scheduler_stepsize"])
+    outfile.create_dataset("hyperparameters/scheduler_factor", data = config["scheduler_factor"])
+    outfile.create_dataset("hyperparameters/num_workers", data = config["num_workers"])
+    outfile.create_dataset("hyperparameters/seed", data = config["seed"])
+    outfile.create_dataset("hyperparameters/freeze_layers", data = config["freeze_layers"])
   
 
-  torch.save(bestweights, "bestweights_task3.pt")
+  torch.save(bestweights, "bestweights_task3_higherlr.pt")
   print("Time:", time.time() - t0, "sec"); t0 = time.time()
-
+  
   ###########################################################################################
   #####                                    Task 4                                       #####
   ###########################################################################################
 
   print("SingleNetwork RGBIr:"); t0 = time.time()
 
-  model = SingleNetwork(pretrained_resnet18, weight_init = "kaiminghe")
+  data_transforms = {
+      'train': transforms.Compose([
+          transforms.Resize(256),
+          transforms.RandomCrop(224),
+          transforms.RandomHorizontalFlip(),
+          transforms.ToTensor(),
+          ChannelSelect([0, 1, 2, 3]),
+          transforms.Normalize([0.7476, 0.6534, 0.4757, 0.0960], [0.1677, 0.1828, 0.2137, 0.0284])
+      ]),
+      'val': transforms.Compose([
+          transforms.Resize(224),
+          transforms.CenterCrop(224),
+          transforms.RandomHorizontalFlip(),
+          transforms.ToTensor(),
+          ChannelSelect([0, 1, 2, 3]),
+          transforms.Normalize([0.7476, 0.6534, 0.4757, 0.0960], [0.1677, 0.1828, 0.2137, 0.0284])
+      ]),
+  }
+  
+  image_datasets={}
+  image_datasets['train'] = RainforestDataset(root_dir = data_root_dir, trvaltest=0, transform = data_transforms['train'])
+  image_datasets['val']   = RainforestDataset(root_dir = data_root_dir, trvaltest=1, transform = data_transforms['val'])
+
+  
+  # Dataloaders
+  #TODO use num_workers=1
+
+  ###################################
+  dataloaders = {}
+  dataloaders['train'] = DataLoader(image_datasets['train'], batch_size = config["batchsize_train"],   shuffle = True, num_workers = config["num_workers"]) # Shuffle to False to ensure reproducability by TAs
+  dataloaders['val']   = DataLoader(image_datasets['val'],   batch_size = config["batchsize_val"],     shuffle = True, num_workers = config["num_workers"]) 
+
+
+  pretrained_resnet18 = models.resnet18(pretrained = True)
+  model = SingleNetwork(pretrained_resnet18, weight_init = "kaiminghe", freeze = config["freeze_layers"])
   model = model.to(device)
+
+  someoptimizer = optim.SGD(model.parameters(), lr = config['lr'])
+
+  somelr_scheduler = lr_scheduler.StepLR(someoptimizer, gamma = config['scheduler_factor'], step_size = config['scheduler_stepsize'])
 
   best_epoch, best_measure, bestweights, trainlosses, \
   testlosses, testperfs, concat_labels, concat_pred, fnames, classwiseperf \
   = traineval2_model_nocv(dataloaders['train'], dataloaders['val'] ,  model ,  lossfct, someoptimizer, somelr_scheduler, num_epochs= config['maxnumepochs'], device = device , numcl = config['numcl'] )
 
-  with h5py.File("diagnostics_task4.h5", "w") as outfile: 
+  with h5py.File("diagnostics_task4_higherlr.h5", "w") as outfile: 
     outfile.create_dataset("best_epoch", data = best_epoch)
     outfile.create_dataset("best_measure", data = best_measure)
     outfile.create_dataset("trainlosses", data = trainlosses)
@@ -422,11 +498,21 @@ def runstuff():
     outfile.create_dataset("concat_labels", data = concat_labels)
     outfile.create_dataset("concat_pred", data = concat_pred)
     outfile.create_dataset("classwise_perf", data = classwiseperf)
+    dt = h5py.special_dtype(vlen=str)
+    outfile.create_dataset("filenames", data = np.array(fnames, dtype = dt))
+    outfile.create_dataset("hyperparameters/use_gpu", data = config["use_gpu"])
+    outfile.create_dataset("hyperparameters/learning_rate", data = config["lr"])
+    outfile.create_dataset("hyperparameters/batchsize_train", data = config["batchsize_train"])
+    outfile.create_dataset("hyperparameters/batchsize_val", data = config["batchsize_val"])
+    outfile.create_dataset("hyperparameters/maxnumepochs", data = config["maxnumepochs"])
+    outfile.create_dataset("hyperparameters/scheduler_stepsize", data = config["scheduler_stepsize"])
+    outfile.create_dataset("hyperparameters/scheduler_factor", data = config["scheduler_factor"])
+    outfile.create_dataset("hyperparameters/num_workers", data = config["num_workers"])
+    outfile.create_dataset("hyperparameters/seed", data = config["seed"])
+    outfile.create_dataset("hyperparameters/freeze_layers", data = config["freeze_layers"])
 
-  np.save("fnames_task4", np.array(fnames))
-  
 
-  torch.save(bestweights, "bestweights_task4.pt")
+  torch.save(bestweights, "bestweights_task4_higherlr.pt")
   print("Time:", time.time() - t0, "sec"); t0 = time.time()
 
 
