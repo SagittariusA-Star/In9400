@@ -231,7 +231,7 @@ class yourloss(nn.modules.loss._Loss):
 def runstuff():
   config = dict()
   config['use_gpu'] = True #True #TODO change this to True for training on the cluster
-  config['lr'] = 0.05
+  config['lr'] = 0.005
   config['batchsize_train'] = 16
   config['batchsize_val'] = 64
   config['maxnumepochs'] = 35
@@ -244,6 +244,7 @@ def runstuff():
   ########################################
   torch.manual_seed(config["seed"])
   torch.cuda.manual_seed(config["seed"])
+  np.random.seed(config["seed"])
   ########################################
 
   # This is a dataset property.
@@ -262,7 +263,7 @@ def runstuff():
       'val': transforms.Compose([
           transforms.Resize(224),
           transforms.CenterCrop(224),
-          transforms.RandomHorizontalFlip(),
+          #transforms.RandomHorizontalFlip(),
           transforms.ToTensor(),
           ChannelSelect(),
           transforms.Normalize([0.7476, 0.6534, 0.4757], [0.1677, 0.1828, 0.2137])
@@ -287,7 +288,7 @@ def runstuff():
   ###################################
   dataloaders = {}
   dataloaders['train'] = DataLoader(image_datasets['train'], batch_size = config["batchsize_train"],   shuffle = True, num_workers = config["num_workers"]) # Shuffle to False to ensure reproducability by TAs
-  dataloaders['val']   = DataLoader(image_datasets['val'],   batch_size = config["batchsize_val"],     shuffle = True, num_workers = config["num_workers"]) 
+  dataloaders['val']   = DataLoader(image_datasets['val'],   batch_size = config["batchsize_val"],     shuffle = False, num_workers = config["num_workers"]) 
 
   ###################################
   # Device
@@ -333,7 +334,7 @@ def runstuff():
   = traineval2_model_nocv(dataloaders['train'], dataloaders['val'], model,  lossfct, someoptimizer, somelr_scheduler, num_epochs= config['maxnumepochs'], device = device , numcl = config['numcl'] )
   
   
-  with h5py.File("diagnostics_task1_higherlr.h5", "w") as outfile: 
+  with h5py.File("diagnostics_task1.h5", "w") as outfile: 
     outfile.create_dataset("best_epoch", data = best_epoch)
     outfile.create_dataset("best_measure", data = best_measure)
     outfile.create_dataset("trainlosses", data = trainlosses)
@@ -356,7 +357,7 @@ def runstuff():
 
     outfile.create_dataset("hyperparameters/freeze_layers", data = config["freeze_layers"])
 
-  torch.save(bestweights, "bestweights_task1_higherlr.pt")
+  torch.save(bestweights, "bestweights_task1.pt")
   print("Time:", time.time() - t0, "sec"); t0 = time.time()
   
   
@@ -364,6 +365,11 @@ def runstuff():
   #####                                    Task 3                                       #####
   ###########################################################################################
   
+  ########################################
+  torch.manual_seed(config["seed"])
+  torch.cuda.manual_seed(config["seed"])
+  np.random.seed(config["seed"])
+  ########################################
   
   print("TwoNetworks:"); t0 = time.time()
 
@@ -379,7 +385,7 @@ def runstuff():
       'val': transforms.Compose([
           transforms.Resize(224),
           transforms.CenterCrop(224),
-          transforms.RandomHorizontalFlip(),
+          #transforms.RandomHorizontalFlip(),
           transforms.ToTensor(),
           ChannelSelect([0, 1, 2, 3]),
           transforms.Normalize([0.7476, 0.6534, 0.4757, 0.0960], [0.1677, 0.1828, 0.2137, 0.0284])
@@ -397,7 +403,7 @@ def runstuff():
   ###################################
   dataloaders = {}
   dataloaders['train'] = DataLoader(image_datasets['train'], batch_size = config["batchsize_train"],   shuffle = True, num_workers = config["num_workers"]) # Shuffle to False to ensure reproducability by TAs
-  dataloaders['val']   = DataLoader(image_datasets['val'],   batch_size = config["batchsize_val"],     shuffle = True, num_workers = config["num_workers"]) 
+  dataloaders['val']   = DataLoader(image_datasets['val'],   batch_size = config["batchsize_val"],     shuffle = False, num_workers = config["num_workers"]) 
 
   pretrained_resnet18_1 = models.resnet18(pretrained = True)
   pretrained_resnet18_2 = models.resnet18(pretrained = True)
@@ -412,7 +418,7 @@ def runstuff():
   testlosses, testperfs, concat_labels, concat_pred, fnames, classwiseperf \
   = traineval2_model_nocv(dataloaders['train'], dataloaders['val'] ,  model ,  lossfct, someoptimizer, somelr_scheduler, num_epochs= config['maxnumepochs'], device = device , numcl = config['numcl'] )
 
-  with h5py.File("diagnostics_task3_higherlr.h5", "w") as outfile: 
+  with h5py.File("diagnostics_task3.h5", "w") as outfile: 
     outfile.create_dataset("best_epoch", data = best_epoch)
     outfile.create_dataset("best_measure", data = best_measure)
     outfile.create_dataset("trainlosses", data = trainlosses)
@@ -435,13 +441,18 @@ def runstuff():
     outfile.create_dataset("hyperparameters/freeze_layers", data = config["freeze_layers"])
   
 
-  torch.save(bestweights, "bestweights_task3_higherlr.pt")
+  torch.save(bestweights, "bestweights_task3.pt")
   print("Time:", time.time() - t0, "sec"); t0 = time.time()
   
   ###########################################################################################
   #####                                    Task 4                                       #####
   ###########################################################################################
 
+  ########################################
+  torch.manual_seed(config["seed"])
+  torch.cuda.manual_seed(config["seed"])
+  np.random.seed(config["seed"])
+  ########################################
   print("SingleNetwork RGBIr:"); t0 = time.time()
 
   data_transforms = {
@@ -456,7 +467,7 @@ def runstuff():
       'val': transforms.Compose([
           transforms.Resize(224),
           transforms.CenterCrop(224),
-          transforms.RandomHorizontalFlip(),
+          #transforms.RandomHorizontalFlip(),
           transforms.ToTensor(),
           ChannelSelect([0, 1, 2, 3]),
           transforms.Normalize([0.7476, 0.6534, 0.4757, 0.0960], [0.1677, 0.1828, 0.2137, 0.0284])
@@ -474,7 +485,7 @@ def runstuff():
   ###################################
   dataloaders = {}
   dataloaders['train'] = DataLoader(image_datasets['train'], batch_size = config["batchsize_train"],   shuffle = True, num_workers = config["num_workers"]) # Shuffle to False to ensure reproducability by TAs
-  dataloaders['val']   = DataLoader(image_datasets['val'],   batch_size = config["batchsize_val"],     shuffle = True, num_workers = config["num_workers"]) 
+  dataloaders['val']   = DataLoader(image_datasets['val'],   batch_size = config["batchsize_val"],     shuffle = False, num_workers = config["num_workers"]) 
 
 
   pretrained_resnet18 = models.resnet18(pretrained = True)
@@ -489,7 +500,7 @@ def runstuff():
   testlosses, testperfs, concat_labels, concat_pred, fnames, classwiseperf \
   = traineval2_model_nocv(dataloaders['train'], dataloaders['val'] ,  model ,  lossfct, someoptimizer, somelr_scheduler, num_epochs= config['maxnumepochs'], device = device , numcl = config['numcl'] )
 
-  with h5py.File("diagnostics_task4_higherlr.h5", "w") as outfile: 
+  with h5py.File("diagnostics_task4.h5", "w") as outfile: 
     outfile.create_dataset("best_epoch", data = best_epoch)
     outfile.create_dataset("best_measure", data = best_measure)
     outfile.create_dataset("trainlosses", data = trainlosses)
@@ -512,7 +523,7 @@ def runstuff():
     outfile.create_dataset("hyperparameters/freeze_layers", data = config["freeze_layers"])
 
 
-  torch.save(bestweights, "bestweights_task4_higherlr.pt")
+  torch.save(bestweights, "bestweights_task4.pt")
   print("Time:", time.time() - t0, "sec"); t0 = time.time()
 
 
