@@ -27,6 +27,7 @@ from RainforestDataset import RainforestDataset, ChannelSelect, get_classes_list
 from YourNetwork import SingleNetwork, TwoNetworks
 import sys 
 import h5py 
+import copy
 
 def train_epoch(model, trainloader, criterion, device, optimizer):
 
@@ -96,7 +97,7 @@ def evaluate_meanavgprecision(model, dataloader, criterion, device, numcl):
       
           images = data['image'].to(device)        
           labels = data['label']
-
+         
           ######################################
           # This was an accuracy computation
 
@@ -178,7 +179,7 @@ def traineval2_model_nocv(dataloader_train, dataloader_test, model,  criterion, 
     print('at epoch: ', epoch,' avgperfmeasure: ', avgperfmeasure, "test loss:", testloss)
 
     if avgperfmeasure > best_measure: #higher is better or lower is better?
-      bestweights = model.state_dict()
+      bestweights = copy.deepcopy(model.state_dict())
       ####################################
       #TODO track current best performance measure and epoch
 
@@ -195,11 +196,9 @@ def traineval2_model_nocv(dataloader_train, dataloader_test, model,  criterion, 
 
   return best_epoch, best_measure, bestweights, trainlosses, testlosses, testperfs, best_labels, best_scores, best_fnames, best_perfmeasure
 
-
 class yourloss(nn.modules.loss._Loss):
 
     def __init__(self, reduction: str = 'mean') -> None:
-        #TODO
         super(yourloss, self).__init__(reduction)
 
         self.reduction = reduction
@@ -220,11 +219,8 @@ class yourloss(nn.modules.loss._Loss):
       Tensor
           Binary cross-entropy loss with sigmoid logits of the multi-class, multi-label, dataset.
       """
-      #TODO
-      ################################################################
       loss_criterion = nn.BCEWithLogitsLoss(reduction = self.reduction)
       loss = loss_criterion(input_, target)
-      ################################################################
       return loss
 
 
