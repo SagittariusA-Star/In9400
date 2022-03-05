@@ -233,7 +233,7 @@ num_epochs = testlosses_1.shape[0]
 
 print(f"Bst epoch: {best_epoch_1 + 1}/{num_epochs}")
 evaluate_diagnostics(classwise_perf_1, concat_labels_1, concat_pred_1, data_root_dir, \
-                        filenames_1, trainlosses_1, testlosses_1, testperfs_1, num_epochs, figdir)
+                        filenames_1, testperfs_1, num_epochs, figdir)
 
 ###########################################################################################
 #####                                     Task 3                                      #####
@@ -256,7 +256,7 @@ num_epochs = testlosses_3.shape[0]
 
 print(f"Bst epoch: {best_epoch_3 + 1}/{num_epochs}")
 evaluate_diagnostics(classwise_perf_3, concat_labels_3, concat_pred_3, data_root_dir, \
-                        filenames_3, trainlosses_3, testlosses_3, testperfs_3, num_epochs, figdir)
+                        filenames_3, testperfs_3, num_epochs, figdir)
 
 ###########################################################################################
 #####                                     Task 4                                      #####
@@ -279,7 +279,7 @@ num_epochs = testlosses_4.shape[0]
 
 print(f"Bst epoch: {best_epoch_4 + 1}/{num_epochs}")
 evaluate_diagnostics(classwise_perf_4, concat_labels_4, concat_pred_4, data_root_dir, \
-                        filenames_4, trainlosses_4, testlosses_4, testperfs_4, num_epochs, figdir)
+                        filenames_4, testperfs_4, num_epochs, figdir)
 
 
 
