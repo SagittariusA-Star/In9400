@@ -43,73 +43,76 @@ class ChannelSelect(torch.nn.Module):
 
 
 class RainforestDataset(Dataset):
+    """A custom data loader for the Planet dataset.
+    """
     def __init__(self, root_dir, trvaltest, transform):
+        """Initiating data loader.
+        Parameters
+        ----------
+        root_dir : str
+            The path to the data root directory.
+        trvaltest : int
+            Takes value 0 or 1, for respectively loading training or testing data.
+        transform : nn.Compose
+            Transform to apply to images that are loaded.
+        """
 
-
-        classes, num_classes = get_classes_list()
+        classes, num_classes = get_classes_list()   # Get class names and number of classes
         
-        # TODO Binarise your multi-labels from the string. HINT: There is a useful sklearn function to
-        # help you binarise from strings.
-
-        #########################
         self.root_dir  = root_dir
         self.transform = transform
         
-        dataframe = pd.read_csv(root_dir + "train_v2.csv")
-        img_name  = dataframe.iloc[:, 0]
+        dataframe = pd.read_csv(root_dir + "train_v2.csv")  # opening dataframe with labels and image filenames
+        img_name  = dataframe.iloc[:, 0]   # image filenames
 
-        labels         = dataframe.iloc[:, 1]
+        labels         = dataframe.iloc[:, 1]     # Extracting labels from data frame.
         labels         = [string.split() for string in labels]
 
-        binarizer      = preprocessing.MultiLabelBinarizer()
+        binarizer      = preprocessing.MultiLabelBinarizer()    # Transforming labels from strings to binaries, 
+        self.labels    = binarizer.fit_transform(labels)        # i.e. whether a given class is present or not.
 
-        self.labels    = binarizer.fit_transform(labels) 
-
-        ### FOR DEBUGGING ###
-        #img_name = img_name[:1500]
-        #self.labels = self.labels[:1500]
-
-        #########################
-
-        # TODO Perform a test train split. It's recommended to use sklearn's train_test_split with the following
-        # parameters: test_size=0.33 and random_state=0 - since these were the parameters used
-        # when calculating the image statistics you are using for data normalisation.
-        
-        #for debugging you can use a test_size=0.66 - this trains then faster
-        
-
-        # OR optionally you could do the test train split of your filenames and labels once, save them, and
-        # from then onwards just load them from file.
-
-
-        #########################
-
+        # Splitting data into training and validation dataset.
         data_train, data_val, label_train, label_val = train_test_split(img_name, self.labels, test_size = 0.33, random_state = 0)
+        
         if trvaltest == 0:      # Training mode
             self.img_filenames = list(data_train)
             self.labels   = np.array(label_train).astype(np.float32)
         else:                   # Validation and "test" (since we sloppily mix these to according to the exerciese text) mode
             self.img_filenames = list(data_val)
             self.labels   = np.array(label_val).astype(np.float32)
-        #########################
-
+        
 
     def __len__(self):
+        """Returning length of dataset
+
+        Returns
+        -------
+        int
+            Length of dataset.
+        """
         return len(self.img_filenames)
 
     def __getitem__(self, idx):
-        # TODO get the label and filename, and load the image from file.
+        """Function that opens and loads images from 
+           the Planet dataset, subsequently applying a transform to it.
 
-        #########################
+        Parameters
+        ----------
+        idx : int
+            Index of image to load
 
-        labels = self.labels[idx]
+        Returns
+        -------
+        dict
+            Dictionary containing image tensor, image labels (binarized) and image filename.
+        """
+
+        labels = self.labels[idx]   
         
         with PIL.Image.open(self.root_dir + "train-tif-v2/" + self.img_filenames[idx] + ".tif") as img:
-            
+            # Opening image and apply transform to it.
             if self.transform:
                 img = self.transform(img)
-
-        #########################
 
             sample = {'image': img,
                     'label': labels,
