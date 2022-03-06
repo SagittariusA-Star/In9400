@@ -6,7 +6,7 @@ import torch
 from torchvision import datasets, models, transforms, utils
 from RainforestDataset import get_classes_list
 import PIL.Image
-
+import os
 
 
 def tail_accuracy(ts, pred, label):
@@ -34,6 +34,10 @@ def tail_accuracy(ts, pred, label):
     return tailac
 
 
+def ensure_exists(dir):
+    exists = os.path.exists(dir)
+    if not exists:
+        os.makedirs(dir)
 
 def evaluate_diagnostics(classwise_perf, concat_labels, concat_pred, data_root_dir, \
                         fnames, testperfs, num_epochs, figdir):
@@ -56,6 +60,8 @@ def evaluate_diagnostics(classwise_perf, concat_labels, concat_pred, data_root_d
     figdir : str
         Figure directory to save figures in
     """
+    ensure_exists(figdir)
+
     idx_highAP = np.argmax(classwise_perf)  # The index of the class with highest AP.
     pred   = concat_pred[:, idx_highAP]     # Prediction scores of high AP class data
     label  = concat_labels[:, idx_highAP]   # Labels of high AP class data
@@ -79,27 +85,16 @@ def evaluate_diagnostics(classwise_perf, concat_labels, concat_pred, data_root_d
     print(f"Bottom-10:\n {pred[::-1][:10]}") 
     print("------------------------------------------------")
     
-    ts = np.linspace(0, np.max(pred), 20)   # Probalility thesholds
 
-    tailac = tail_accuracy(ts, concat_pred, concat_labels)  # tailaccuracy
-
-    # Plotting tailaccuracy
-
-    fig, ax = plt.subplots(figsize = (8, 5))
-    colors = plt.cm.get_cmap("tab20")
-    for i in range(ncls):
-        ax.plot(ts, tailac[i, :], color = colors.colors[i])
-    
-    ax.plot(ts, np.nanmean(tailac, axis = 0), "r--", linewidth = 5)
-    
-    ax.set_xlabel("Acceptance threshold t")
-    ax.set_ylabel("Tail accuracy")
-    ax.grid()
-    ax.legend([f"{label_names[i]}" for i in range(ncls)] + ["Average"], ncol = 2, loc = "lower right")
-    #ax.set_ylim(-0.1, 1.1)
-
-    plt.savefig(figdir + "tailaccuracy.pdf", bbox_inches = 'tight')
-
+    fonts = {
+    "font.family": "serif",
+    "axes.labelsize": 10,
+    "font.size": 10,
+    "legend.fontsize": 10,
+    "xtick.labelsize": 10,
+    "ytick.labelsize": 10
+    }
+    plt.rcParams.update(fonts)
 
     # Plot top-10 and bottom-10 images
     figt = plt.figure(figsize = (16, 4))  # Figure and axis for top-10 images
@@ -184,6 +179,17 @@ def evaluate_diagnostics(classwise_perf, concat_labels, concat_pred, data_root_d
     figt.savefig(figdir + "top10.pdf", bbox_inches = 'tight')
     figb.savefig(figdir + "bottom10.pdf", bbox_inches = 'tight')
     
+
+    fonts = {
+    "font.family": "serif",
+    "axes.labelsize": 16,
+    "font.size": 16,
+    "legend.fontsize": 10,
+    "xtick.labelsize": 16,
+    "ytick.labelsize": 16
+    }
+    plt.rcParams.update(fonts)
+
     # Plot average precisions per class and epoch
     fig, ax = plt.subplots(figsize = (8, 5))
     colors = plt.cm.get_cmap("tab20")
@@ -203,6 +209,35 @@ def evaluate_diagnostics(classwise_perf, concat_labels, concat_pred, data_root_d
     fig.tight_layout()
     fig.savefig(figdir + "APs.pdf", bbox_inches = 'tight')
 
+
+    ts = np.linspace(0, np.max(pred), 20)   # Probalility thesholds
+
+    tailac = tail_accuracy(ts, concat_pred, concat_labels)  # tailaccuracy
+
+    # Plotting tailaccuracy
+    fonts = {
+    "font.family": "serif",
+    "axes.labelsize": 20,
+    "font.size": 20,
+    "legend.fontsize": 12,
+    "xtick.labelsize": 20,
+    "ytick.labelsize": 20
+    }
+    plt.rcParams.update(fonts)
+    fig, ax = plt.subplots(figsize = (8, 5))
+    colors = plt.cm.get_cmap("tab20")
+    for i in range(ncls):
+        ax.plot(ts, tailac[i, :], color = colors.colors[i])
+    
+    ax.plot(ts, np.nanmean(tailac, axis = 0), "r--", linewidth = 5)
+    
+    ax.set_xlabel("Acceptance threshold t")
+    ax.set_ylabel("Tail accuracy")
+    ax.grid()
+    ax.legend([f"{label_names[i]}" for i in range(ncls)] + ["Average"], ncol = 2, loc = "lower right")
+    #ax.set_ylim(-0.1, 1.1)
+
+    plt.savefig(figdir + "tailaccuracy.pdf", bbox_inches = 'tight')
 
 
 #========================================================
@@ -284,14 +319,15 @@ evaluate_diagnostics(classwise_perf_4, concat_labels_4, concat_pred_4, data_root
 
 
 figdir = "../../figs/default/"
+ensure_exists(figdir)
 
 fonts = {
 "font.family": "serif",
-"axes.labelsize": 12,
-"font.size": 12,
-"legend.fontsize": 12,
-"xtick.labelsize": 12,
-"ytick.labelsize": 12
+"axes.labelsize": 16,
+"font.size": 16,
+"legend.fontsize": 16,
+"xtick.labelsize": 16,
+"ytick.labelsize": 16
 }
 plt.rcParams.update(fonts)
 
@@ -315,7 +351,7 @@ ax.set_xticks(class_num)
 ax.set_xticklabels(label_names, rotation = 30)
 ax.set_xlabel("Class labels")
 ax.set_ylabel("Average precision")
-ax.legend()
+ax.legend(loc = "upper center")
 fig.tight_layout()
 plt.savefig(figdir + "best_classwise_perf.pdf", bbox_inches = "tight")
 
