@@ -9,7 +9,7 @@ import torch
 # here you plug in your modelfile depending on what you have developed: simple rnn, 2 layer, or attention
 # if you have 3 modelfiles a.py b.py c.py then you do: from a import ...
 # or you have one file with n different imgcapmodels
-from cocoSource_xcnnfused_GRU import ImageCaptionModel
+from cocoSource_xcnnfused_LSTM import ImageCaptionModel
 
 
 def main(config, modelParam):
@@ -58,7 +58,7 @@ if __name__ == '__main__':
         'data_dir': data_dir,  # data directory
         'img_dir': 'loss_images_test/',
         'modelsDir': 'storedModels_test/',
-        'modelName': 'model_0/',  # name of your trained model
+        'modelName': 'model_lstm/',  # name of your trained model
         'restoreModelLast': 0,
         'restoreModelBest': 0,
         'modeSetups': [['train', True], ['val', True]],

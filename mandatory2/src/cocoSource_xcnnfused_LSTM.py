@@ -65,16 +65,15 @@ class ImageCaptionModel(nn.Module):
         processed_cnn_features = self.input_layer(cnn_features)
         
         batch_size = cnn_features.data.shape[0] # Extracting batch_size from input tensor
-        device = cnn_features.get_device()      # Extracting currently used device to send initialized hidden state to same device
-
+        
         if current_hidden_state is None:
             # TODO: Initialize initial_hidden_state with correct dimensions depending on the cell type.
             # The shape of the hidden state here should be [num_rnn_layers, batch_size, hidden_state_sizes].
             # Remember that each rnn cell needs its own initial state.
             if self.cell_type == "LSTM":
-                initial_hidden_state = torch.zeros((self.num_rnn_layers, batch_size, 2 * self.hidden_state_sizes)).to(device)
+                initial_hidden_state = torch.zeros((self.num_rnn_layers, batch_size, 2 * self.hidden_state_sizes), device = cnn_features.device)
             else:
-                initial_hidden_state = torch.zeros((self.num_rnn_layers, batch_size, self.hidden_state_sizes)).to(device)
+                initial_hidden_state = torch.zeros((self.num_rnn_layers, batch_size, self.hidden_state_sizes), device = cnn_features.device)
 
         else:
             initial_hidden_state = current_hidden_state
@@ -195,6 +194,7 @@ class RNN(nn.Module):
             self.cells = nn.ModuleList([GRUCell(hidden_state_size = hidden_state_size,
                                   input_size = input_size_list[i])
                                   for i in range(self.num_rnn_layers)])
+
         elif self.cell_type == "LSTM":
             self.cells = nn.ModuleList([LSTMCell(hidden_state_size = hidden_state_size,
                                   input_size = input_size_list[i])
