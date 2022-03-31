@@ -395,19 +395,27 @@ class LSTMCell(nn.Module):
 
         # Forget gate parameters
         
-        self.weight_f = nn.Parameter(torch.randn(input_size + hidden_state_size, hidden_state_size) / np.sqrt(input_size + hidden_state_size))
+        self.weight_f = nn.Parameter(torch.normal(0, 
+                                     1 / np.sqrt((hidden_state_size + input_size) * hidden_state_size),    # Initializing as random normal with zero mean
+                                     size = (hidden_state_size + input_size, hidden_state_size)))             # and variance corresponding to 1 / (number of elements in tensor)
         self.bias_f   = nn.Parameter(torch.zeros(1, hidden_state_size))
         
         # Input gate parameters
-        self.weight_i = nn.Parameter(torch.randn(input_size + hidden_state_size, hidden_state_size) / np.sqrt(input_size + hidden_state_size))
+        self.weight_i = nn.Parameter(torch.normal(0, 
+                                     1 / np.sqrt((hidden_state_size + input_size) * hidden_state_size),    # Initializing as random normal with zero mean
+                                     size = (hidden_state_size + input_size, hidden_state_size)))             # and variance corresponding to 1 / (number of elements in tensor)
         self.bias_i   = nn.Parameter(torch.zeros(1, hidden_state_size))
 
         # Output gate parameters
-        self.weight_o = nn.Parameter(torch.randn(input_size + hidden_state_size, hidden_state_size) / np.sqrt(input_size + hidden_state_size))
+        self.weight_o = nn.Parameter(torch.normal(0, 
+                                     1 / np.sqrt((hidden_state_size + input_size) * hidden_state_size),    # Initializing as random normal with zero mean
+                                     size = (hidden_state_size + input_size, hidden_state_size)))             # and variance corresponding to 1 / (number of elements in tensor)
         self.bias_o   = nn.Parameter(torch.zeros(1, hidden_state_size))
         
         # Memory cell parameters
-        self.weight = nn.Parameter(torch.randn(input_size + hidden_state_size, hidden_state_size) / np.sqrt(input_size + hidden_state_size))
+        self.weight = nn.Parameter(torch.normal(0, 
+                                     1 / np.sqrt((hidden_state_size + input_size) * hidden_state_size),    # Initializing as random normal with zero mean
+                                     size = (hidden_state_size + input_size, hidden_state_size)))             # and variance corresponding to 1 / (number of elements in tensor)
         self.bias   = nn.Parameter(torch.zeros(1, hidden_state_size))
 
     def forward(self, x, hidden_state):

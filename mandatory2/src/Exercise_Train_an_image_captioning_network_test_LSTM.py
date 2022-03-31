@@ -82,7 +82,7 @@ if __name__ == '__main__':
         #'featurepathstub': 'detectron2m_features' ,
         #'featurepathstub': 'detectron2cocov3_tenmfeatures' ,
         'featurepathstub': 'detectron2_lim10maxfeatures' ,
-        'cellType':  'LSTM'  # RNN or GRU or GRU??
+        'cellType':  'LSTM'  # RNN or GRU or LSTM??
     }
 
     if modelParam['inference'] == True:
