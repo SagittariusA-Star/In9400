@@ -4,15 +4,17 @@ from utils.model import Model
 from utils.trainer import Trainer
 from utils.validate import plotImagesAndCaptions
 from utils.validate_metrics import validateCaptions
+import numpy as np
+import torch
 # here you plug in your modelfile depending on what you have developed: simple rnn, 2 layer, or attention
 # if you have 3 modelfiles a.py b.py c.py then you do: from a import ...
 # or you have one file with n different imgcapmodels
-from cocoSource_xcnnfused import imageCaptionModel
+from cocoSource_xcnnfused_attention import ImageCaptionModel
 
 
 def main(config, modelParam):
     # create an instance of the model you want
-    model = Model(config, modelParam, imageCaptionModel)
+    model = Model(config, modelParam, ImageCaptionModel)
 
     # create an instacne of the saver and resoterer class
     saveRestorer = SaverRestorer(config, modelParam)
@@ -31,25 +33,32 @@ def main(config, modelParam):
 
     #plotImagesAndCaptions
     if modelParam['inference'] == True:
-        #plotImagesAndCaptions(model, modelParam, config, dataLoader)
+        plotImagesAndCaptions(model, modelParam, config, dataLoader)
         validateCaptions(model, modelParam, config, dataLoader)
 
 
 ########################################################################################################################
 if __name__ == '__main__':
-    data_dir = '/itf-fi-ml/shared/IN5400/dataforall/mandatory2/data/coco/'
+    #data_dir = '/itf-fi-ml/shared/IN5400/dataforall/mandatory2/data/coco/'
+    data_dir = '/mn/stornext/u3/nilsoles/In9400/mandatory2/data/'
+   
+    # Setting random seeds for reproducability sake.
+    seed = 7646839
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    np.random.seed(seed)
 
     #train
     modelParam = {
         'batch_size': 128,  # Training batch size
-        'cuda': {'use_cuda': True,  # Use_cuda=True: use GPU
+        'cuda': {'use_cuda': False,  # Use_cuda=True: use GPU
                  'device_idx': 0},  # Select gpu index: 0,1,2,3
         'numbOfCPUThreadsUsed': 10,  # Number of cpu threads use in the dataloader
-        'numbOfEpochs': 99,  # Number of epochs
+        'numbOfEpochs': 50,  # Number of epochs
         'data_dir': data_dir,  # data directory
         'img_dir': 'loss_images_test/',
         'modelsDir': 'storedModels_test/',
-        'modelName': 'model_0/',  # name of your trained model
+        'modelName': 'model_lstm/',  # name of your trained model
         'restoreModelLast': 0,
         'restoreModelBest': 0,
         'modeSetups': [['train', True], ['val', True]],
@@ -66,14 +75,15 @@ if __name__ == '__main__':
         'vocabulary_size': 10000,  # number of different words
         'truncated_backprop_length': 25,
         'hidden_state_sizes': 512,  #
-        'num_rnn_layers': 1,  # number of stacked rnn's
+        'num_rnn_layers': 2,  # number of stacked rnn's
         'scheduler_milestones': [75,90], #45,70 end at 80? or 60, 80
         'scheduler_factor': 0.2, #+0.25 dropout
         #'featurepathstub': 'detectron2vg_features' ,
         #'featurepathstub': 'detectron2m_features' ,
         #'featurepathstub': 'detectron2cocov3_tenmfeatures' ,
-        'featurepathstub': 'detectron2_lim10maxfeatures' ,
-        'cellType':  'RNN' #'GRU'  # RNN or GRU or GRU??
+        'featurepathstub': 'detectron2_lim10features' ,
+        #'featurepathstub': 'detectron2_lim10maxfeatures' ,
+        'cellType':  'Attention'  # RNN or GRU or LSTM??
     }
 
     if modelParam['inference'] == True:

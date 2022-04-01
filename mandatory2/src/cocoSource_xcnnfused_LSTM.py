@@ -184,9 +184,9 @@ class RNN(nn.Module):
         # TODO: len(input_size_list) == num_rnn_layers and input_size_list[i] should contain the input size for layer i.
         # This is used to populate self.cells
         if self.cell_type == "GRU":
-            input_size_list = [input_size, hidden_state_size + hidden_state_size]
+            input_size_list = [input_size, hidden_state_size]
         elif self.cell_type == "LSTM":
-            input_size_list = [input_size, hidden_state_size + hidden_state_size]
+            input_size_list = [input_size, hidden_state_size]
 
         # TODO: Create a list of type "nn.ModuleList" and populate it with cells of type
         #       "self.cell_type" - depending on the number of RNN layers.
@@ -199,7 +199,7 @@ class RNN(nn.Module):
             self.cells = nn.ModuleList([LSTMCell(hidden_state_size = hidden_state_size,
                                   input_size = input_size_list[i])
                                   for i in range(self.num_rnn_layers)])
-
+        
     def forward(self, tokens, processed_cnn_features, initial_hidden_state, output_layer: nn.Linear,
                 embedding_layer: nn.Embedding, is_train=True) -> tuple:
         """
@@ -247,7 +247,7 @@ class RNN(nn.Module):
             for j in range(self.num_rnn_layers):
                 current_hidden_state = current_hidden_state.clone()
                 current_hidden_state[j, :] = self.cells[j](inputs[j], current_hidden_state[j, ...].clone())
-                inputs.append(current_hidden_state[j, ...])   # Input to to next layer will be hidden state from previous layer
+                inputs.append(current_hidden_state[j, :, :self.hidden_state_size])   # Input to to next layer will be hidden state from previous layer
 
             logits_i = output_layer(current_hidden_state[-1, :, :self.hidden_state_size])    # Transforming last layer hidden state output to logits.
                                                                                           # By indexing with :self.hidden_state_size along last axis we make sure only the hidden state of the 
@@ -395,27 +395,31 @@ class LSTMCell(nn.Module):
 
         # Forget gate parameters
         
-        self.weight_f = nn.Parameter(torch.normal(0, 
-                                     1 / np.sqrt((hidden_state_size + input_size) * hidden_state_size),    # Initializing as random normal with zero mean
-                                     size = (hidden_state_size + input_size, hidden_state_size)))             # and variance corresponding to 1 / (number of elements in tensor)
+        self.weight_f = nn.Parameter(
+                        torch.randn(input_size + hidden_state_size, hidden_state_size) 
+                        / np.sqrt(input_size + hidden_state_size)
+            )
         self.bias_f   = nn.Parameter(torch.zeros(1, hidden_state_size))
         
         # Input gate parameters
-        self.weight_i = nn.Parameter(torch.normal(0, 
-                                     1 / np.sqrt((hidden_state_size + input_size) * hidden_state_size),    # Initializing as random normal with zero mean
-                                     size = (hidden_state_size + input_size, hidden_state_size)))             # and variance corresponding to 1 / (number of elements in tensor)
+        self.weight_i = nn.Parameter(
+                                    torch.randn(input_size + hidden_state_size, hidden_state_size) 
+                                    / np.sqrt(input_size + hidden_state_size)
+            )
         self.bias_i   = nn.Parameter(torch.zeros(1, hidden_state_size))
 
         # Output gate parameters
-        self.weight_o = nn.Parameter(torch.normal(0, 
-                                     1 / np.sqrt((hidden_state_size + input_size) * hidden_state_size),    # Initializing as random normal with zero mean
-                                     size = (hidden_state_size + input_size, hidden_state_size)))             # and variance corresponding to 1 / (number of elements in tensor)
+        self.weight_o = nn.Parameter(
+                                    torch.randn(input_size + hidden_state_size, hidden_state_size) 
+                                    / np.sqrt(input_size + hidden_state_size)
+            )
         self.bias_o   = nn.Parameter(torch.zeros(1, hidden_state_size))
         
         # Memory cell parameters
-        self.weight = nn.Parameter(torch.normal(0, 
-                                     1 / np.sqrt((hidden_state_size + input_size) * hidden_state_size),    # Initializing as random normal with zero mean
-                                     size = (hidden_state_size + input_size, hidden_state_size)))             # and variance corresponding to 1 / (number of elements in tensor)
+        self.weight = nn.Parameter(
+                                    torch.randn(input_size + hidden_state_size, hidden_state_size) 
+                                    / np.sqrt(input_size + hidden_state_size)
+            )
         self.bias   = nn.Parameter(torch.zeros(1, hidden_state_size))
 
     def forward(self, x, hidden_state):
