@@ -71,6 +71,7 @@ if __name__ == '__main__':
         'learningRate': {'lr': 0.001},  # learning rate to the optimizer
         'weight_decay': 0.00001,  # weight_decay value
         'number_of_cnn_features': 2048,  # Fixed, do not change
+        "number_of_attention_windows": 10, # Added this part for task 4; the attention model
         'embedding_size': 300,  # word embedding_layer size
         'vocabulary_size': 10000,  # number of different words
         'truncated_backprop_length': 25,

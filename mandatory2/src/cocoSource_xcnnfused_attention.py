@@ -15,6 +15,7 @@ class ImageCaptionModel(nn.Module):
         self.vocabulary_size = config['vocabulary_size']
         self.embedding_size = config['embedding_size']
         self.number_of_cnn_features = config['number_of_cnn_features']
+        self.number_of_attention_windows = config["number_of_attention_windows"]
         self.hidden_state_sizes = config['hidden_state_sizes']
         self.num_rnn_layers = config['num_rnn_layers']
         self.cell_type = config['cellType']
@@ -29,7 +30,7 @@ class ImageCaptionModel(nn.Module):
         self.input_layer = nn.Sequential(
             nn.Dropout(0.25),
             nn.Conv1d(in_channels = self.number_of_cnn_features, out_channels = self.nn_map_size, kernel_size = 1),
-            nn.BatchNorm1d(self.nn_map_size),
+            nn.BatchNorm1d(self.nn_map_size),   # Keeping default parameters
             nn.LeakyReLU()  # Keeping default parameters
         )
 
@@ -48,10 +49,33 @@ class ImageCaptionModel(nn.Module):
             self.rnn = RNNOneLayerSimplified(input_size=self.embedding_size + self.nn_map_size,
                                              hidden_state_size=self.hidden_state_sizes)
         else:
-            self.rnn = RNN(input_size=self.embedding_size + self.nn_map_size,
-                           hidden_state_size=self.hidden_state_sizes,
-                           num_rnn_layers=self.num_rnn_layers,
-                           cell_type=self.cell_type)
+            if self.cell_type == "Attention":
+                # Simple 2-layer network that learnes attention weights:
+                self.weight_net = nn.Sequential(
+                    nn.Dropout(0.25),
+                    nn.Linear(self.hidden_state_sizes, 50, bias = True),
+                    nn.LeakyReLU(),  # Keeping default parameters
+                    nn.Linear(50, self.number_of_attention_windows, bias = True),
+                    nn.Softmax(dim = 1)
+                )
+
+                self.pool = nn.Sequential(
+                    nn.MaxPool1d(kernel_size = self.number_of_attention_windows), # Max pooling to remove "spacial" input dimension 10. Needed for 1st LSTM
+                    nn.Flatten() # Removing potential signelt dimensions remaining after max pooling.
+                )
+
+                self.layer_nets = nn.ModuleList([self.pool, self.weight_net])   # Contains pooling for first layer LSTM and attention head for last layer LSTM.
+                self.rnn = RNN(input_size=self.embedding_size + self.nn_map_size,
+                                hidden_state_size=self.hidden_state_sizes,
+                                num_rnn_layers=self.num_rnn_layers,
+                                last_layer_size = self.nn_map_size, # Since we want to weight the output of the input_layer 
+                                cell_type = self.cell_type)         # with computed attention weights before sending them into last layer LSTM
+
+            else:
+                self.rnn = RNN(input_size=self.embedding_size + self.nn_map_size,
+                                hidden_state_size=self.hidden_state_sizes,
+                                num_rnn_layers=self.num_rnn_layers,
+                                cell_type=self.cell_type)
 
     def forward(self, cnn_features, x_tokens, is_train: bool, current_hidden_state=None) -> tuple:
         """
@@ -63,8 +87,11 @@ class ImageCaptionModel(nn.Module):
         :return: logits of shape [batch_size, truncated_backprop_length, vocabulary_size] and new current_hidden_state
                 of size [num_rnn_layers, batch_size, hidden_state_sizes]
         """
-        print(cnn_features.shape)
-        sys.exit()
+        if self.cell_type == "Attention":
+            # If we use the attention model then we want the CNN features to be on form in_channels = 2048 and length = 10.
+            # Therefore we swap axis 1 and 2 order to make it compatable to torch convension needed in input_layer.
+            cnn_features = cnn_features.transpose(2, 1)
+
         processed_cnn_features = self.input_layer(cnn_features)
         
         batch_size = cnn_features.data.shape[0] # Extracting batch_size from input tensor
@@ -73,7 +100,7 @@ class ImageCaptionModel(nn.Module):
             # TODO: Initialize initial_hidden_state with correct dimensions depending on the cell type.
             # The shape of the hidden state here should be [num_rnn_layers, batch_size, hidden_state_sizes].
             # Remember that each rnn cell needs its own initial state.
-            if self.cell_type == "LSTM":
+            if self.cell_type == "LSTM" or self.cell_type == "Attention":
                 initial_hidden_state = torch.zeros((self.num_rnn_layers, batch_size, 2 * self.hidden_state_sizes), device = cnn_features.device)
             else:
                 initial_hidden_state = torch.zeros((self.num_rnn_layers, batch_size, self.hidden_state_sizes), device = cnn_features.device)
@@ -82,8 +109,12 @@ class ImageCaptionModel(nn.Module):
             initial_hidden_state = current_hidden_state
 
         # Call self.rnn to get the "logits" and the new hidden state
-        logits, hidden_state = self.rnn(x_tokens, processed_cnn_features, initial_hidden_state, self.output_layer,
-                                        self.embedding_layer, is_train)
+        if self.cell_type == "Attention":
+            logits, hidden_state = self.rnn(x_tokens, processed_cnn_features, initial_hidden_state, self.output_layer,
+                                            self.embedding_layer, self.layer_nets, is_train)
+        else:
+            logits, hidden_state = self.rnn(x_tokens, processed_cnn_features, initial_hidden_state, self.output_layer,
+                                            self.embedding_layer, is_train)
 
         return logits, hidden_state
 
@@ -171,25 +202,29 @@ class RNNOneLayerSimplified(nn.Module):
 
 
 class RNN(nn.Module):
-    def __init__(self, input_size, hidden_state_size, num_rnn_layers, cell_type='GRU'):
+    def __init__(self, input_size, hidden_state_size, num_rnn_layers, last_layer_size = None, cell_type='GRU'):
         """
         :param input_size: Size of the embeddings
         :param hidden_state_size: Number of units in the RNN cells (will be equal for all RNN layers)
         :param num_rnn_layers: Number of stacked RNN layers
+        :param last_layer_size: Number of weighted image features as input for last LSTM.
         :param cell_type: The type cell to use like vanilla RNN, GRU or GRU.
         """
         super(RNN, self).__init__()
         self.input_size = input_size
         self.hidden_state_size = hidden_state_size
         self.num_rnn_layers = num_rnn_layers
+        self.last_layer_size = last_layer_size
         self.cell_type = cell_type
 
         # TODO: len(input_size_list) == num_rnn_layers and input_size_list[i] should contain the input size for layer i.
         # This is used to populate self.cells
         if self.cell_type == "GRU":
-            input_size_list = [input_size, hidden_state_size + hidden_state_size]
+            input_size_list = [input_size, hidden_state_size]
         elif self.cell_type == "LSTM":
-            input_size_list = [input_size, hidden_state_size + hidden_state_size]
+            input_size_list = [input_size, hidden_state_size]
+        elif self.cell_type == "Attention":
+            input_size_list = [input_size] + [hidden_state_size] * (self.num_rnn_layers - 2) + [last_layer_size]
 
         # TODO: Create a list of type "nn.ModuleList" and populate it with cells of type
         #       "self.cell_type" - depending on the number of RNN layers.
@@ -203,8 +238,14 @@ class RNN(nn.Module):
                                   input_size = input_size_list[i])
                                   for i in range(self.num_rnn_layers)])
 
+        elif self.cell_type == "Attention":
+            self.cells = nn.ModuleList([LSTMCell(hidden_state_size = hidden_state_size,
+                                  input_size = input_size_list[i])
+                                  for i in range(self.num_rnn_layers)])
+            
+            
     def forward(self, tokens, processed_cnn_features, initial_hidden_state, output_layer: nn.Linear,
-                embedding_layer: nn.Embedding, is_train=True) -> tuple:
+                embedding_layer: nn.Embedding, layer_nets: nn.ModuleList, is_train=True) -> tuple:
         """
         :param tokens: Words and chars that are to be used as inputs for the RNN.
                        Shape: [batch_size, truncated_backpropagation_length]
@@ -213,6 +254,7 @@ class RNN(nn.Module):
         :param output_layer: The final layer to be used to produce the output. Uses RNN's final output as input.
                              It is an instance of nn.Linear
         :param embedding_layer: The layer to be used to generate input embeddings for the RNN.
+        :param layer_net: Contain networks and operations to be applied to the input to an LSTM on a given layer.
         :param is_train: Boolean variable indicating whether you're training the network or not.
                          If training mode is off then the predicted token should be fed as the input
                          for the next step in the sequence.
@@ -234,6 +276,10 @@ class RNN(nn.Module):
         # TODO: Fetch the first (index 0) embeddings that should go as input to the RNN.
         # Use these tokens in the loop(s) below
         input_tokens = embeddings[:, 0, :]  # Should have shape (batch_size, embedding_size)
+        
+        if self.cell_type == "Attention":
+            pooled_processed_cnn_features = layer_nets[0](processed_cnn_features)
+
         for i in range(sequence_length):
             if i == 0:
                 current_hidden_state = torch.zeros_like(current_hidden_state)
@@ -245,12 +291,20 @@ class RNN(nn.Module):
             # 3. If you are at the last layer, then produce logits_i, predictions. Append logits_i to logits_sequence.
             #    See the simplified rnn for the one layer version.
 
+            if self.cell_type == "Attention":
+                inputs = [torch.cat((input_tokens, pooled_processed_cnn_features), dim = 1)]
+            else:
+                inputs = [torch.cat((input_tokens, processed_cnn_features), dim = 1)]
 
-            inputs = [torch.cat((input_tokens, processed_cnn_features), dim = 1)]
             for j in range(self.num_rnn_layers):
                 current_hidden_state = current_hidden_state.clone()
                 current_hidden_state[j, :] = self.cells[j](inputs[j], current_hidden_state[j, ...].clone())
-                inputs.append(current_hidden_state[j, ...])   # Input to to next layer will be hidden state from previous layer
+                if j == self.num_rnn_layers - 2:
+                    weights = layer_nets[-1](current_hidden_state[j, :, :self.hidden_state_size].clone())
+                    weighted_features = (weights.unsqueeze(1) * processed_cnn_features).sum(dim = 2) # Weighting all 10 arrays of len 512 with computed weights, and summing over all 10 vectors
+                    inputs.append(weighted_features)
+                else:
+                    inputs.append(current_hidden_state[j, :, :self.hidden_state_size])   # Input to to next layer will be hidden state from previous layer
 
             logits_i = output_layer(current_hidden_state[-1, :, :self.hidden_state_size])    # Transforming last layer hidden state output to logits.
                                                                                           # By indexing with :self.hidden_state_size along last axis we make sure only the hidden state of the 
