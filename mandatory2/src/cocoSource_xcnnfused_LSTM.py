@@ -184,9 +184,9 @@ class RNN(nn.Module):
         # TODO: len(input_size_list) == num_rnn_layers and input_size_list[i] should contain the input size for layer i.
         # This is used to populate self.cells
         if self.cell_type == "GRU":
-            input_size_list = [input_size, hidden_state_size]
+            input_size_list = [input_size] + [hidden_state_size] * (self.num_rnn_layers - 1)
         elif self.cell_type == "LSTM":
-            input_size_list = [input_size, hidden_state_size]
+            input_size_list = [input_size] + [hidden_state_size] * (self.num_rnn_layers - 1)
 
         # TODO: Create a list of type "nn.ModuleList" and populate it with cells of type
         #       "self.cell_type" - depending on the number of RNN layers.
@@ -399,7 +399,7 @@ class LSTMCell(nn.Module):
                         torch.randn(input_size + hidden_state_size, hidden_state_size) 
                         / np.sqrt(input_size + hidden_state_size)
             )
-        self.bias_f   = nn.Parameter(torch.zeros(1, hidden_state_size))
+        self.bias_f   = nn.Parameter(2 * torch.ones(1, hidden_state_size))
         
         # Input gate parameters
         self.weight_i = nn.Parameter(

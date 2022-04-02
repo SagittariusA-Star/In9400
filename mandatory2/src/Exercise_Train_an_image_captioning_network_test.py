@@ -6,6 +6,7 @@ from utils.validate import plotImagesAndCaptions
 from utils.validate_metrics import validateCaptions
 import numpy as np
 import torch
+import random
 # here you plug in your modelfile depending on what you have developed: simple rnn, 2 layer, or attention
 # if you have 3 modelfiles a.py b.py c.py then you do: from a import ...
 # or you have one file with n different imgcapmodels
@@ -47,6 +48,7 @@ if __name__ == '__main__':
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     np.random.seed(seed)
+    ranndom.seed(seed)
 
     #train
     modelParam = {

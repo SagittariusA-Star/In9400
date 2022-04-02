@@ -184,7 +184,7 @@ class RNN(nn.Module):
 
         # TODO: len(input_size_list) == num_rnn_layers and input_size_list[i] should contain the input size for layer i.
         # This is used to populate self.cells
-        input_size_list = [input_size, hidden_state_size]
+        input_size_list = [input_size] + [hidden_state_size] * (self.num_rnn_layers - 1)
 
         # TODO: Create a list of type "nn.ModuleList" and populate it with cells of type
         #       "self.cell_type" - depending on the number of RNN layers.

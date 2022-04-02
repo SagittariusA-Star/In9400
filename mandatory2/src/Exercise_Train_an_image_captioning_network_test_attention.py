@@ -6,6 +6,7 @@ from utils.validate import plotImagesAndCaptions
 from utils.validate_metrics import validateCaptions
 import numpy as np
 import torch
+import random
 # here you plug in your modelfile depending on what you have developed: simple rnn, 2 layer, or attention
 # if you have 3 modelfiles a.py b.py c.py then you do: from a import ...
 # or you have one file with n different imgcapmodels
@@ -47,18 +48,21 @@ if __name__ == '__main__':
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     np.random.seed(seed)
-
+    random.seed(seed)
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
+    
     #train
     modelParam = {
         'batch_size': 128,  # Training batch size
         'cuda': {'use_cuda': False,  # Use_cuda=True: use GPU
-                 'device_idx': 0},  # Select gpu index: 0,1,2,3
+                 'device_idx': 3},  # Select gpu index: 0,1,2,3
         'numbOfCPUThreadsUsed': 10,  # Number of cpu threads use in the dataloader
-        'numbOfEpochs': 50,  # Number of epochs
+        'numbOfEpochs': 100,  # Number of epochs
         'data_dir': data_dir,  # data directory
         'img_dir': 'loss_images_test/',
         'modelsDir': 'storedModels_test/',
-        'modelName': 'model_lstm/',  # name of your trained model
+        'modelName': 'model_attention/',  # name of your trained model
         'restoreModelLast': 0,
         'restoreModelBest': 0,
         'modeSetups': [['train', True], ['val', True]],

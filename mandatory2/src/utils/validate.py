@@ -44,6 +44,7 @@ def plotImagesAndCaptions(model, modelParam, config, dataLoader):
     print('predicted_tokens.shape',predicted_tokens.shape)
 
     batchInd = 0
+    
 
     sentence = []
     foundEnd = False
@@ -70,6 +71,8 @@ def plotImagesAndCaptions(model, modelParam, config, dataLoader):
     img = mpimg.imread(imgpath)
     plt.ion()
     ax.imshow(img)
+    #fig.savefig("img1.png")
+    #print(imgpath)
     plt.show()
     aa = 1
     return

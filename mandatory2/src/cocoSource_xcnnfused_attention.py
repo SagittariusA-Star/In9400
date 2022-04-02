@@ -53,7 +53,7 @@ class ImageCaptionModel(nn.Module):
                 # Simple 2-layer network that learnes attention weights:
                 self.weight_net = nn.Sequential(
                     nn.Dropout(0.25),
-                    nn.Linear(self.hidden_state_sizes, 50, bias = True),
+                    nn.Linear(2 * self.hidden_state_sizes, 50, bias = True),    # It says in task4 that the attention block takes in hidden and cell memory
                     nn.LeakyReLU(),  # Keeping default parameters
                     nn.Linear(50, self.number_of_attention_windows, bias = True),
                     nn.Softmax(dim = 1)
@@ -220,9 +220,9 @@ class RNN(nn.Module):
         # TODO: len(input_size_list) == num_rnn_layers and input_size_list[i] should contain the input size for layer i.
         # This is used to populate self.cells
         if self.cell_type == "GRU":
-            input_size_list = [input_size, hidden_state_size]
+            input_size_list = [input_size] + [hidden_state_size] * (self.num_rnn_layers - 1)
         elif self.cell_type == "LSTM":
-            input_size_list = [input_size, hidden_state_size]
+            input_size_list = [input_size] + [hidden_state_size] * (self.num_rnn_layers - 1)
         elif self.cell_type == "Attention":
             input_size_list = [input_size] + [hidden_state_size] * (self.num_rnn_layers - 2) + [last_layer_size]
 
@@ -300,7 +300,7 @@ class RNN(nn.Module):
                 current_hidden_state = current_hidden_state.clone()
                 current_hidden_state[j, :] = self.cells[j](inputs[j], current_hidden_state[j, ...].clone())
                 if j == self.num_rnn_layers - 2:
-                    weights = layer_nets[-1](current_hidden_state[j, :, :self.hidden_state_size].clone())
+                    weights = layer_nets[-1](current_hidden_state[j, ...].clone())  # Attention head takes concatenation of hidden and memory.
                     weighted_features = (weights.unsqueeze(1) * processed_cnn_features).sum(dim = 2) # Weighting all 10 arrays of len 512 with computed weights, and summing over all 10 vectors
                     inputs.append(weighted_features)
                 else:
@@ -455,7 +455,7 @@ class LSTMCell(nn.Module):
         self.weight_f = nn.Parameter(torch.normal(0, 
                                      1 / np.sqrt((hidden_state_size + input_size) * hidden_state_size),    # Initializing as random normal with zero mean
                                      size = (hidden_state_size + input_size, hidden_state_size)))             # and variance corresponding to 1 / (number of elements in tensor)
-        self.bias_f   = nn.Parameter(torch.zeros(1, hidden_state_size))
+        self.bias_f   = nn.Parameter(2 * torch.ones(1, hidden_state_size))
         
         # Input gate parameters
         self.weight_i = nn.Parameter(torch.normal(0, 

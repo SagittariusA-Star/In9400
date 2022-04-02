@@ -2,10 +2,13 @@ from utils.dataLoader import DataLoaderWrapper
 from utils.saverRestorer import SaverRestorer
 from utils.model import Model
 from utils.trainer import Trainer
-from utils.validate import plotImagesAndCaptions
+#from utils.validate import plotImagesAndCaptions
+from utils.validate_and_generate_images import plotImagesAndCaptions
 from utils.validate_metrics import validateCaptions
 import numpy as np
 import torch
+import random
+
 # here you plug in your modelfile depending on what you have developed: simple rnn, 2 layer, or attention
 # if you have 3 modelfiles a.py b.py c.py then you do: from a import ...
 # or you have one file with n different imgcapmodels
@@ -33,7 +36,7 @@ def main(config, modelParam):
 
     #plotImagesAndCaptions
     if modelParam['inference'] == True:
-        #plotImagesAndCaptions(model, modelParam, config, dataLoader)
+        plotImagesAndCaptions(model, modelParam, config, dataLoader)
         validateCaptions(model, modelParam, config, dataLoader)
 
 
@@ -47,6 +50,9 @@ if __name__ == '__main__':
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     np.random.seed(seed)
+    random.seed(seed)
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
 
     #train
     modelParam = {
@@ -63,7 +69,7 @@ if __name__ == '__main__':
         'restoreModelBest': 0,
         'modeSetups': [['train', True], ['val', True]],
         'inNotebook': False,  # If running script in jupyter notebook
-        'inference': False
+        'inference': True
     }
 
     config = {
@@ -76,13 +82,13 @@ if __name__ == '__main__':
         'truncated_backprop_length': 25,
         'hidden_state_sizes': 512,  #
         'num_rnn_layers': 2,  # number of stacked rnn's
-        'scheduler_milestones': [75,90], #45,70 end at 80? or 60, 80
+        'scheduler_milestones': [75, 90], #45,70 end at 80? or 60, 80
         'scheduler_factor': 0.2, #+0.25 dropout
         #'featurepathstub': 'detectron2vg_features' ,
         #'featurepathstub': 'detectron2m_features' ,
         #'featurepathstub': 'detectron2cocov3_tenmfeatures' ,
         'featurepathstub': 'detectron2_lim10maxfeatures' ,
-        'cellType':  'GRU'  # RNN or GRU or GRU??
+        'cellType':  'GRU'  # RNN or GRU or LSTM??
     }
 
     if modelParam['inference'] == True:

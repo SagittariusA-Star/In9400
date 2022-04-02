@@ -42,7 +42,6 @@ def validateCaptions(model, modelParam, config, dataLoader):
         #batchInd = 0
         
         
-        
         for batchInd in range(predicted_tokens.shape[0]):
 
             tokensentence =[]
